@@ -1,8 +1,8 @@
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+margin: 0;
+padding: 0;
+box-sizing: border-box;
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
@@ -49,7 +49,7 @@ body {
 
 /* Kisebbre vett másodlagos cím */
 h1 {
-    font-size: 1.8rem; 
+    font-size: 1.8rem;
     color: #ffffff;
     margin-bottom: 5px;
     font-weight: 400;  /* Kevésbé vastag, hogy ne nyomja el a fenti szöveget */
@@ -73,8 +73,111 @@ p {
     margin: 0 auto 15px auto;
 }
 
+/* BRAND NEW AUTH STYLING CONTAINER */
+.auth-section {
+    margin: 35px auto 10px auto;
+    padding: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    max-width: 440px;
+}
+
+.btn {
+    /* Flex grid configuration */
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+
+    /* Layout styling */
+    padding: 12px 28px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    border: none;
+    outline: none;
+
+    /* Strict content constraints */
+    white-space: nowrap !important;
+    width: max-content;
+    margin: 0 auto;             /* Centers the button inside the container */
+}
+
+.google-icon {
+    background: white;
+    border-radius: 4px;
+    padding: 2px;
+
+    /* Strict layout layout sizing */
+    display: inline-block !important;
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;  /* Prevents collapsing */
+    flex-shrink: 0;             /* Prevents flex squishing */
+}
+
+
+
+.btn-login {
+    background-color: #2ed591;
+    color: #0f1411;
+    box-shadow: 0 4px 15px rgba(46, 213, 145, 0.2);
+}
+
+.btn-login:hover {
+    background-color: #25b379;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(46, 213, 145, 0.3);
+}
+
+.btn-login:active {
+    transform: translateY(0);
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#user-img {
+width: 45px;
+height: 45px;
+border-radius: 50%;
+object-fit: cover;
+border: 2px solid #2ed591;
+}
+
+#user-name {
+font-size: 1.1rem;
+color: #ffffff;
+font-weight: 500;
+}
+
+.btn-logout {
+    background-color: transparent;
+    color: #718096;
+    border: 1px solid rgba(113, 128, 150, 0.4);
+    font-size: 0.9rem;
+    padding: 8px 20px;
+}
+
+.btn-logout:hover {
+    color: #e2e8f0;
+    border-color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.02);
+}
+
 .footer {
-    margin-top: 50px;
+    margin-top: 40px;
     font-size: 0.85rem;
     color: #4a5568;
 }
