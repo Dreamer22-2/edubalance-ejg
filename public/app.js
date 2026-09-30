@@ -68,7 +68,7 @@ auth.onAuthStateChanged((user) => {
             if (doc.exists && doc.data().role === 'admin') {
                 // USER IS AN ADMIN 👑 -> Change greeting text format
                 console.log("Admin role verified for user.");
-                if (userNameDisplay) userNameDisplay.innerText = `Üdvözöljük, ${user.displayName} Adminisztrátor Úr!`;
+                if (userNameDisplay) userNameDisplay.innerText = `Üdvözöljük, ${user.displayName} Adminisztrátor Úr! Btw tanulj bioszt`;
             } else {
                 // USER IS A REGULAR USER 👥 -> Keep standard greeting
                 console.log("Standard user role verified.");
