@@ -1,11 +1,13 @@
 // =========================================================================
-// 1. FIREBASE AUTH & PROVIDER SETUP
+// 1. FIREBASE SETUP (AUTH & FIRESTORE)
 // =========================================================================
 const auth = firebase.auth();
+const db = firebase.firestore(); // Initialize Firestore database connection
 
-// Force connection to the local auth emulator if running locally
+// Force connection to local emulators if testing locally
 if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
     auth.useEmulator("http://127.0.0.1:9099");
+    db.useEmulator("127.0.0.1", 8080); // Connects to the local Firestore database
 }
 
 const provider = new firebase.auth.GoogleAuthProvider();
@@ -25,8 +27,7 @@ const userImgDisplay = document.getElementById('user-img');
 function signInWithGoogle() {
     auth.signInWithPopup(provider)
     .then((result) => {
-        // The onAuthStateChanged listener below will handle the UI changes smoothly
-        console.log("Popup login sequence completed for:", result.user.displayName);
+        console.log("Popup login completed.");
     })
     .catch((error) => {
         console.error("Authentication Error:", error.message);
@@ -45,32 +46,44 @@ function signOut() {
 }
 
 // =========================================================================
-// 4. AUTH STATE LISTENER (The UI Controller)
+// 4. AUTH STATE LISTENER WITH ROLE DETECTION
 // =========================================================================
 auth.onAuthStateChanged((user) => {
     if (user) {
-        console.log("Successfully logged in user recognized by listener:", user.displayName);
+        console.log("User logged in:", user.uid);
 
-        // Update elements visibility
+        // 1. Show UI elements immediately using generic fallback greeting while we fetch data
         if (loginBtn) loginBtn.style.setProperty('display', 'none', 'important');
         if (userSection) userSection.style.setProperty('display', 'block', 'important');
         if (logoutBtn) logoutBtn.style.setProperty('display', 'inline-flex', 'important');
-
-        // Populate data
         if (userNameDisplay) userNameDisplay.innerText = `Szia, ${user.displayName}!`;
         if (userImgDisplay) {
             userImgDisplay.src = user.photoURL || 'https://placeholder.com';
             userImgDisplay.alt = user.displayName;
         }
-    } else {
-        console.log("No user logged in (or user signed out). Showing login button.");
 
-        // Update elements visibility
+        // 2. Fetch the user's role document from Firestore database
+        db.collection('users').doc(user.uid).get()
+        .then((doc) => {
+            if (doc.exists && doc.data().role === 'admin') {
+                // USER IS AN ADMIN 👑 -> Change greeting text format
+                console.log("Admin role verified for user.");
+                if (userNameDisplay) userNameDisplay.innerText = `Üdvözöljük, ${user.displayName} Adminisztrátor Úr!`;
+            } else {
+                // USER IS A REGULAR USER 👥 -> Keep standard greeting
+                console.log("Standard user role verified.");
+                if (userNameDisplay) userNameDisplay.innerText = `Szia, ${user.displayName}!`;
+            }
+        })
+        .catch((error) => {
+            console.error("Error loading user role from Firestore:", error);
+        });
+
+    } else {
+        console.log("No user logged in. Resetting UI view.");
         if (loginBtn) loginBtn.style.setProperty('display', 'inline-flex', 'important');
         if (userSection) userSection.style.setProperty('display', 'none', 'important');
         if (logoutBtn) logoutBtn.style.setProperty('display', 'none', 'important');
-
-        // Reset data fields
         if (userNameDisplay) userNameDisplay.innerText = '';
         if (userImgDisplay) userImgDisplay.src = '';
     }
