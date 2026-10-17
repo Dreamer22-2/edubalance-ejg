@@ -275,3 +275,44 @@ select {
 .save-btn:hover {
     background-color: #25b379;
 }
+
+/* =========================================================================
+   EXPANDABLE TABLE ROW ANIMATION
+   ========================================================================= */
+
+.user-main-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.user-details-row td {
+    padding: 0 !important;
+    border-bottom: none !important;
+}
+
+.details-wrapper {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0 15px;
+}
+
+.user-details-row.expanded .details-wrapper {
+    max-height: 150px; /* Adjust if your content needs more vertical space */
+    padding: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.details-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in;
+}
+
+.user-details-row.expanded .details-content {
+    opacity: 1;
+    transition-delay: 0.1s; /* Fades text in slightly after the slide-down starts */
+}

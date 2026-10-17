@@ -41,21 +41,50 @@ function loadAllUsers() {
             const userData = doc.data();
             const userId = doc.id;
 
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
+            let createdAtFormatted = 'N/A';
+            if (userData.createdAt) {
+                const date = userData.createdAt.toDate ? userData.createdAt.toDate() : new Date(userData.createdAt);
+                createdAtFormatted = date.toLocaleString('hu-HU');
+            }
+
+            const trMain = document.createElement('tr');
+            trMain.className = 'user-main-row';
+            trMain.innerHTML = `
                 <td>${userData.name || 'N/A'}</td>
                 <td>${userData.email || 'N/A'}</td>
                 <td>
-                    <select id="role-${userId}">
+                    <select id="role-${userId}" onclick="event.stopPropagation()">
                         <option value="user" ${userData.role === 'user' ? 'selected' : ''}>user</option>
                         <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>admin</option>
                     </select>
                 </td>
-                <td>
+                <td onclick="event.stopPropagation()">
                     <button class="save-btn" onclick="updateUserRole('${userId}')">Mentés</button>
                 </td>
             `;
-            usersTableBody.appendChild(tr);
+
+            const trDetails = document.createElement('tr');
+            trDetails.className = 'user-details-row';
+            trDetails.innerHTML = `
+                <td colspan="4">
+                    <div class="details-wrapper">
+                        <div class="details-content">
+                            <img src="${userData.photoURL || 'https://via.placeholder.com/45'}" alt="Profilkép" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #2ed591;">
+                            <div>
+                                <div><strong>UUID:</strong> ${userId}</div>
+                                <div style="margin-top: 5px;"><strong>Létrehozva:</strong> ${createdAtFormatted}</div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            `;
+
+            trMain.addEventListener('click', () => {
+                trDetails.classList.toggle('expanded');
+            });
+
+            usersTableBody.appendChild(trMain);
+            usersTableBody.appendChild(trDetails);
         });
     })
     .catch((error) => {
