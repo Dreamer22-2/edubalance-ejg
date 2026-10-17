@@ -113,7 +113,9 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt &&
         isValidRoleUpdate(userId);
 
-      allow delete: if false;
+      // Only admins may remove another user's Firestore profile. This does not
+      // delete the corresponding Firebase Authentication account.
+      allow delete: if isAdmin() && userId != request.auth.uid;
     }
   }
 }

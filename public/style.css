@@ -821,6 +821,37 @@ select {
     background-color: #25b379;
 }
 
+.user-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.delete-btn {
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 107, 107, 0.45);
+    border-radius: 4px;
+    background: rgba(255, 71, 87, 0.12);
+    color: #ff777f;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.delete-btn:hover:not(:disabled) {
+    border-color: #ff4757;
+    background: #ff4757;
+    color: #ffffff;
+}
+
+.delete-btn:disabled {
+    border-color: rgba(160, 174, 192, 0.2);
+    background: rgba(160, 174, 192, 0.06);
+    color: #718096;
+    cursor: not-allowed;
+}
+
 /* =========================================================================
    SEAMLESS EXPANDABLE TABLE ROWS & ZEBRA STRIPING
    ========================================================================= */

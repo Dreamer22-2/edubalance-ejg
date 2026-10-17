@@ -247,7 +247,14 @@ function renderTable(users) {
                 </select>
             </td>
             <td onclick="event.stopPropagation()">
-                <button class="save-btn" onclick="updateUserRole('${userId}')">Mentés</button>
+                <div class="user-actions">
+                    <button class="save-btn" onclick="updateUserRole('${userId}')">Mentés</button>
+                    <button
+                        class="delete-btn"
+                        type="button"
+                        ${userId === adminUid ? 'disabled title="A saját admin fiókod nem törölhető innen."' : `onclick="deleteUserProfile('${userId}', event)"`}
+                    >Törlés</button>
+                </div>
             </td>
         `;
 
@@ -310,4 +317,35 @@ window.updateUserRole = function(userId) {
         console.error("Error updating role:", error);
         showToast("Hiba a mentés során: " + error.message, "error");
     });
+};
+
+window.deleteUserProfile = async function(userId, event) {
+    event.stopPropagation();
+    if (userId === adminUid) {
+        showToast('A saját admin profilod nem törölhető.', 'error');
+        return;
+    }
+
+    const user = allUsersData.find((entry) => entry.id === userId);
+    if (!user) {
+        showToast('A felhasználó már nincs a betöltött listában. Frissítsd a listát.', 'error');
+        return;
+    }
+
+    const confirmed = window.confirm(
+        `Biztosan törlöd ${user.name || user.email || 'ezt a felhasználót'} Firestore-profilját?\n\n` +
+        'Ez eltávolítja a profilt az EduBalance-ból. A Firebase Authentication-fiók megmarad, ezért a felhasználó újbóli bejelentkezéskor új profilt kaphat. A művelet nem vonható vissza.'
+    );
+    if (!confirmed) return;
+
+    try {
+        await db.collection('users').doc(userId).delete();
+        allUsersData = allUsersData.filter((entry) => entry.id !== userId);
+        writeCachedUsers();
+        renderFilteredUsers();
+        showToast('A felhasználói profil törölve. A Firebase-fiók megmaradt.', 'success');
+    } catch (error) {
+        console.error('Error deleting user profile:', error);
+        showToast(`Nem sikerült törölni a felhasználói profilt: ${error.message}`, 'error');
+    }
 };
