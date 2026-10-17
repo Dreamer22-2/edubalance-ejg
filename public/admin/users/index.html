@@ -16,8 +16,9 @@
             </header>
 
             <div id="admin-content" style="display: none;">
-                <div style="margin-bottom: 20px;">
-                    <input type="text" id="user-search-input" placeholder="Keresés név vagy email alapján...">
+                <div class="users-toolbar">
+                    <input type="text" id="user-search-input" placeholder="Keresés a betöltött felhasználók között...">
+                    <button id="refresh-users-btn" class="save-btn" type="button">Frissítés</button>
                 </div>
 
                 <div class="table-container">
@@ -35,6 +36,13 @@
                         </tbody>
                     </table>
                 </div>
+                <div id="users-list-status" class="users-list-status" role="status" aria-live="polite"></div>
+                <div id="users-loading" class="users-loading" role="status" aria-live="polite" hidden>
+                    <span class="users-loading-spinner" aria-hidden="true"></span>
+                    <span>Felhasználók betöltése...</span>
+                </div>
+                <button id="load-more-users-btn" class="users-load-more" type="button" hidden>Továbbiak betöltése</button>
+                <div id="users-load-sentinel" aria-hidden="true"></div>
             </div>
         </main>
     </div>

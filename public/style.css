@@ -18,6 +18,13 @@ body {
     width: 100vw;
 }
 
+.app-layout {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .container {
     max-width: 600px;
     background: rgba(23, 28, 26, 0.8);
@@ -78,6 +85,9 @@ p {
 
 .admin-sidebar {
     width: 260px;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
     background: rgba(0, 0, 0, 0.4);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
@@ -85,6 +95,8 @@ p {
     padding: 24px;
     box-sizing: border-box;
     flex-shrink: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .sidebar-logo {
@@ -167,31 +179,64 @@ p {
 
 .admin-main {
     flex: 1;
-    padding: 40px;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
     box-sizing: border-box;
 }
 
 .site-header {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 24px;
-    margin: -8px 0 36px;
-    padding-bottom: 20px;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 24px 40px 20px;
+    background: linear-gradient(135deg, rgba(18, 30, 23, 0.88), rgba(15, 20, 17, 0.76));
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0);
+    transition: box-shadow 220ms ease;
+}
+
+.site-header.is-scrolled {
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.42);
+}
+
+.admin-scroll-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 28px 40px 40px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    box-sizing: border-box;
+}
+
+.site-header-title {
+    min-width: 0;
+}
+
+.site-page-title {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #2ed591;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    line-height: 1.2;
 }
 
 [hidden],
 button[hidden] {
     display: none !important;
-}
-
-.site-brand {
-    color: #2ed591;
-    font-size: 1.25rem;
-    font-weight: 700;
-    text-decoration: none;
 }
 
 .landing-heading {
@@ -222,6 +267,10 @@ button[hidden] {
     display: flex;
     align-items: center;
     gap: 14px;
+}
+
+.header-account {
+    margin-left: auto;
 }
 
 .header-user img {
@@ -445,11 +494,84 @@ button[hidden] {
     border-color: #2ed591;
 }
 
+.users-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.users-toolbar #user-search-input {
+    box-sizing: border-box;
+}
+
+.users-toolbar .save-btn:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
 .table-container {
     width: 100%;
     overflow-x: auto;
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
+}
+
+.users-list-status {
+    min-height: 1.5em;
+    margin-top: 12px;
+    color: #a0aec0;
+    font-size: 0.9rem;
+}
+
+.users-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    color: #a0aec0;
+}
+
+.users-loading[hidden] {
+    display: none;
+}
+
+.users-loading-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(46, 213, 145, 0.25);
+    border-top-color: #2ed591;
+    border-radius: 50%;
+    animation: users-spinner 0.75s linear infinite;
+}
+
+@keyframes users-spinner {
+    to { transform: rotate(360deg); }
+}
+
+.users-load-more {
+    display: block;
+    margin: 8px auto 16px;
+    padding: 10px 16px;
+    border: 1px solid rgba(46, 213, 145, 0.5);
+    border-radius: 6px;
+    background: transparent;
+    color: #2ed591;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.users-load-more:hover {
+    background: rgba(46, 213, 145, 0.1);
+}
+
+.users-load-more[hidden] {
+    display: none;
+}
+
+#users-load-sentinel {
+    height: 1px;
 }
 
 .admin-table {
@@ -607,6 +729,10 @@ select {
 
     .admin-sidebar {
         width: 100%;
+        height: auto;
+        max-height: min(36vh, 280px);
+        min-height: 0;
+        flex: 0 1 auto;
         padding: 16px;
         border-right: 0;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -636,18 +762,38 @@ select {
     }
 
     .admin-main {
-        padding: 24px 16px;
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 0;
     }
 
     .site-header {
         align-items: flex-start;
         gap: 16px;
-        margin-bottom: 24px;
+        padding: 18px 16px 16px;
+    }
+
+    .admin-scroll-content {
+        padding: 24px 16px;
     }
 
     .header-user {
         flex-wrap: wrap;
         justify-content: flex-end;
         gap: 8px;
+    }
+
+    .users-toolbar {
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 480px) {
+    .users-toolbar {
+        flex-direction: column;
+    }
+
+    .users-toolbar #user-search-input {
+        max-width: none;
     }
 }

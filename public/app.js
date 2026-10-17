@@ -3,6 +3,7 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const appLayout = document.querySelector('.app-layout');
 const appMain = appLayout?.querySelector('.admin-main');
+const pageTitle = appMain?.querySelector('.admin-header h1');
 
 const schoolEmailPattern = /@e5vos\.hu$/i;
 
@@ -17,7 +18,7 @@ function renderSidebar(role) {
     const sidebar = appLayout.querySelector('.admin-sidebar');
     const activeRoute = getActiveRoute();
     const generalLinks = [
-        { label: 'EduBalance', href: '/', roles: ['visitor', 'user', 'admin'] }
+        { label: 'Főoldal', href: '/', roles: ['visitor', 'user', 'admin'] }
     ];
     const adminLinks = [
         { label: 'Admin Konzol', href: '/admin/' },
@@ -83,7 +84,7 @@ function initializeAppShell() {
     appLayout.insertAdjacentHTML('afterbegin', '<aside class="admin-sidebar"></aside>');
     appMain.insertAdjacentHTML('afterbegin', `
         <header class="site-header">
-            <a class="site-brand" href="/" aria-label="EduBalance kezdőlap">EduBalance</a>
+            <div class="site-header-title"></div>
             <div class="header-account">
                 <button id="login-btn" class="btn btn-login" type="button">Belépés Google-fiókkal</button>
                 <div id="user-section" class="header-user" hidden>
@@ -94,6 +95,26 @@ function initializeAppShell() {
             </div>
         </header>
     `);
+    if (pageTitle) {
+        const titleContainer = appMain.querySelector('.site-header-title');
+        titleContainer.appendChild(pageTitle);
+        pageTitle.classList.add('site-page-title');
+        pageTitle.closest('.admin-header')?.remove();
+        if (appMain.querySelector('#member-content')) pageTitle.hidden = true;
+    }
+    const scrollContent = document.createElement('div');
+    scrollContent.className = 'admin-scroll-content';
+    Array.from(appMain.children).forEach((child) => {
+        if (!child.classList.contains('site-header')) scrollContent.appendChild(child);
+    });
+    appMain.appendChild(scrollContent);
+
+    const siteHeader = appMain.querySelector('.site-header');
+    const updateHeaderScrollState = () => {
+        siteHeader.classList.toggle('is-scrolled', scrollContent.scrollTop > 0);
+    };
+    scrollContent.addEventListener('scroll', updateHeaderScrollState, { passive: true });
+    updateHeaderScrollState();
 
     appMain.querySelector('#login-btn').addEventListener('click', () => {
         auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
@@ -161,6 +182,7 @@ function renderHomeForRole(role) {
     const isMember = role === 'user' || role === 'admin';
     visitorContent.hidden = isMember;
     memberContent.hidden = !isMember;
+    if (pageTitle) pageTitle.hidden = !isMember;
     document.title = 'EduBalance';
 }
 
