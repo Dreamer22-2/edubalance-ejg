@@ -1,210 +1,163 @@
-// =========================================================================
-// 1. FIREBASE SETUP (AUTH & FIRESTORE)
-// =========================================================================
+(() => {
 const auth = firebase.auth();
-const db = firebase.firestore(); // Initialize Firestore database connection
+const db = firebase.firestore();
+const appLayout = document.querySelector('.app-layout');
+const appMain = appLayout?.querySelector('.admin-main');
 
-// Force connection to local emulators if testing locally
-if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
-    auth.useEmulator("http://127.0.0.1:9099");
-    db.useEmulator("127.0.0.1", 8080); // Connects to the local Firestore database
+const schoolEmailPattern = /@e5vos\.hu$/i;
+
+function getActiveRoute() {
+    const path = window.location.pathname;
+    if (path.startsWith('/admin/users')) return '/admin/users/';
+    if (path.startsWith('/admin')) return '/admin/';
+    if (path.startsWith('/app')) return '/app/';
+    return '/';
 }
 
-const provider = new firebase.auth.GoogleAuthProvider();
+function renderSidebar(role) {
+    const sidebar = appLayout.querySelector('.admin-sidebar');
+    const activeRoute = getActiveRoute();
+    const links = [
+        { label: 'Kezdőlap', href: '/', roles: ['visitor', 'user', 'admin'] },
+        { label: 'Alkalmazás', href: '/app/', roles: ['user', 'admin'] },
+        { label: 'Admin áttekintés', href: '/admin/', roles: ['admin'] },
+        { label: 'Felhasználók', href: '/admin/users/', roles: ['admin'] }
+    ];
 
-// =========================================================================
-// 2. DOM ELEMENTS
-// =========================================================================
-const loginBtn = document.getElementById('login-btn');
-const logoutBtn = document.getElementById('logout-btn');
-const userSection = document.getElementById('user-section');
-const userNameDisplay = document.getElementById('user-name');
-const userImgDisplay = document.getElementById('user-img');
-
-// =========================================================================
-// 3. AUTHENTICATION FUNCTIONS & FIRESTORE USER PROFILE CREATION
-// =========================================================================
-function signInWithGoogle() {
-    auth.signInWithPopup(provider)
-    .then((result) => {
-        console.log("Popup login completed.");
-        const user = result.user;
-        
-        // Check if user document exists in Firestore, if not create it
-        const userRef = db.collection('users').doc(user.uid);
-        userRef.get().then((doc) => {
-            if (!doc.exists) {
-                // First time login: Create user profile document in Firestore
-                return userRef.set({
-                    uid: user.uid,
-                    name: user.displayName || "Névtelen Felhasználó",
-                    email: user.email || "",
-                    photoURL: user.photoURL || "",
-                    role: "user", // Default role
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            }
-        }).catch((error) => {
-            console.error("Error creating/checking user document:", error);
-        });
-
-    })
-    .catch((error) => {
-        console.error("Authentication Error:", error.message);
-        alert("Sikertelen belépés: " + error.message);
-    });
+    sidebar.innerHTML = `
+        <h2>EduBalance</h2>
+        <nav class="sidebar-nav" aria-label="Fő navigáció">
+            ${links
+                .filter((link) => link.roles.includes(role))
+                .map((link) => `<a class="sidebar-link${link.href === activeRoute ? ' active' : ''}" href="${link.href}">${link.label}</a>`)
+                .join('')}
+        </nav>
+    `;
 }
 
-function signOut() {
-    auth.signOut()
-    .then(() => {
-        console.log("Sign out sequence completed.");
-    })
-    .catch((error) => {
-        console.error("Sign Out Error:", error.message);
-    });
-}
+function renderHeader(user) {
+    const header = appMain.querySelector('.site-header');
+    const loginButton = header.querySelector('#login-btn');
+    const userSection = header.querySelector('#user-section');
+    const userImage = header.querySelector('#user-img');
+    const userName = header.querySelector('#user-name');
 
-// =========================================================================
-// 4. AUTH STATE LISTENER WITH ROLE DETECTION
-// =========================================================================
-auth.onAuthStateChanged((user) => {
-    if (user) {
-        console.log("User logged in:", user.uid);
+    if (!user) {
+        loginButton.hidden = false;
+        userSection.hidden = true;
+        return;
+    }
 
-        // 1. Show UI elements immediately using generic fallback greeting while we fetch data
-        if (loginBtn) loginBtn.style.setProperty('display', 'none', 'important');
-        if (userSection) userSection.style.setProperty('display', 'block', 'important');
-        if (logoutBtn) logoutBtn.style.setProperty('display', 'inline-flex', 'important');
-        if (userNameDisplay) userNameDisplay.innerText = `Szia, ${user.displayName}!`;
-        if (userImgDisplay) {
-            userImgDisplay.src = user.photoURL || 'https://placeholder.com';
-            userImgDisplay.alt = user.displayName;
-        }
-
-        // 2. Fetch the user's role document from Firestore database
-        db.collection('users').doc(user.uid).get()
-        .then((doc) => {
-            if (doc.exists && doc.data().role === 'admin') {
-                // USER IS AN ADMIN 👑 -> Change greeting text format
-                console.log("Admin role verified for user.");
-                if (userNameDisplay) userNameDisplay.innerText = `Üdvözöljük, ${user.displayName} Adminisztrátor Úr!\n\nBtw 👌`;
-                
-                // Optional: Automatically redirect or show admin navigation if on admin paths
-                checkAdminRouteProtection(true);
-            } else {
-                // USER IS A REGULAR USER 👥 -> Keep standard greeting
-                console.log("Standard user role verified.");
-                if (userNameDisplay) userNameDisplay.innerText = `Szia, ${user.displayName}!`;
-                checkAdminRouteProtection(false);
-            }
-        })
-        .catch((error) => {
-            console.error("Error loading user role from Firestore:", error);
-        });
-
+    loginButton.hidden = true;
+    userSection.hidden = false;
+    userName.textContent = user.displayName || user.email || 'Bejelentkezett felhasználó';
+    if (user.photoURL) {
+        userImage.src = user.photoURL;
+        userImage.hidden = false;
     } else {
-        console.log("No user logged in. Resetting UI view.");
-        if (loginBtn) loginBtn.style.setProperty('display', 'inline-flex', 'important');
-        if (userSection) userSection.style.setProperty('display', 'none', 'important');
-        if (logoutBtn) logoutBtn.style.setProperty('display', 'none', 'important');
-        if (userNameDisplay) userNameDisplay.innerText = '';
-        if (userImgDisplay) userImgDisplay.src = '';
-        
-        checkAdminRouteProtection(false);
-    }
-});
-
-// =========================================================================
-// 5. ADMIN ROUTE PROTECTION & MANAGEMENT TOOLS
-// =========================================================================
-function checkAdminRouteProtection(isAdmin) {
-    const currentPath = window.location.pathname;
-    const isAdminRoute = currentPath.startsWith('/admin');
-
-    if (isAdminRoute && !isAdmin) {
-        // If user tries to access /admin or /admin/users without admin rights, redirect home
-        console.warn("Unauthorized access attempt to admin panel. Redirecting...");
-        window.location.href = '/';
-    } else if (isAdminRoute && isAdmin) {
-        // Load admin management tools if we are on the user management subpage
-        if (currentPath.includes('/admin/users')) {
-            loadAdminUserManagementTools();
-        }
+        userImage.removeAttribute('src');
+        userImage.hidden = true;
     }
 }
 
-// Function to fetch all users for Admin User Management Panel
-function loadAdminUserManagementTools() {
-    console.log("Initializing Admin User Management Tool...");
-    const userTableContainer = document.getElementById('admin-user-list');
-    if (!userTableContainer) return;
+function initializeAppShell() {
+    if (!appLayout || !appMain || appLayout.dataset.shellInitialized) return;
+    appLayout.dataset.shellInitialized = 'true';
+    appLayout.insertAdjacentHTML('afterbegin', '<aside class="admin-sidebar"></aside>');
+    appMain.insertAdjacentHTML('afterbegin', `
+        <header class="site-header">
+            <a class="site-brand" href="/" aria-label="EduBalance kezdőlap">EduBalance</a>
+            <div class="header-account">
+                <button id="login-btn" class="btn btn-login" type="button">Belépés Google-fiókkal</button>
+                <div id="user-section" class="header-user" hidden>
+                    <img id="user-img" alt="" hidden>
+                    <span id="user-name"></span>
+                    <button id="logout-btn" class="btn btn-logout" type="button">Kijelentkezés</button>
+                </div>
+            </div>
+        </header>
+    `);
 
-    userTableContainer.innerHTML = "<p>Felhasználók betöltése...</p>";
+    appMain.querySelector('#login-btn').addEventListener('click', () => {
+        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+            .catch((error) => {
+                console.error('Google sign-in failed:', error);
+                showToast(`Sikertelen belépés: ${error.message}`, 'error');
+            });
+    });
 
-    db.collection('users').get().then((querySnapshot) => {
-        let html = `<table class="admin-table">
-            <thead>
-                <tr>
-                    <th>Név / E-mail</th>
-                    <th>Szerepkör (Role)</th>
-                    <th>Műveletek</th>
-                </tr>
-            </thead>
-            <tbody>`;
-
-        querySnapshot.forEach((doc) => {
-            const userData = doc.data();
-            html += `<tr>
-                <td>
-                    <strong>${userData.name || 'N/A'}</strong><br>
-                    <small>${userData.email || ''}</small>
-                </td>
-                <td>
-                    <select onchange="updateUserRole('${userData.uid}', this.value)">
-                        <option value="user" ${userData.role === 'user' ? 'selected' : ''}>User</option>
-                        <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>Admin</option>
-                    </select>
-                </td>
-                <td>
-                    <button onclick="saveUserChanges('${userData.uid}')" class="btn-sm">Mentés</button>
-                </td>
-            </tr>`;
+    appMain.querySelector('#logout-btn').addEventListener('click', () => {
+        auth.signOut().catch((error) => {
+            console.error('Sign out failed:', error);
+            showToast('Nem sikerült kijelentkezni.', 'error');
         });
-
-        html += `</tbody></table>`;
-        userTableContainer.innerHTML = html;
-    }).catch((error) => {
-        console.error("Error fetching users for admin:", error);
-        userTableContainer.innerHTML = "<p style='color:red;'>Hiba történt a felhasználók betöltése közben.</p>";
     });
+
+    renderSidebar('visitor');
+    renderHeader(null);
 }
 
-// Function allowing admins to update roles or fields
-window.updateUserRole = function(uid, newRole) {
-    db.collection('users').doc(uid).update({ role: newRole })
-    .then(() => {
-        console.log(`User ${uid} role updated to ${newRole}`);
-    })
-    .catch((error) => {
-        console.error("Error updating user role:", error);
-        alert("Nem sikerült módosítani a szerepkört.");
-    });
-};
+async function ensureUserProfile(user) {
+    const userRef = db.collection('users').doc(user.uid);
+    const userSnapshot = await userRef.get();
+    const isSchoolUser = user.emailVerified && schoolEmailPattern.test(user.email || '');
+    let profile;
 
-window.saveUserChanges = function(uid) {
-    alert(`A(z) ${uid} azonosítójú felhasználó adatai frissítve lettek!`);
-};
+    if (!userSnapshot.exists) {
+        profile = {
+            uid: user.uid,
+            name: user.displayName || 'Névtelen felhasználó',
+            email: user.email || '',
+            photoURL: user.photoURL || '',
+            role: isSchoolUser ? 'user' : 'visitor',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        await userRef.set(profile);
+        return profile.role;
+    }
 
-// =========================================================================
-// 6. EVENT LISTENERS
-// =========================================================================
-if (loginBtn) loginBtn.addEventListener('click', signInWithGoogle);
-if (logoutBtn) logoutBtn.addEventListener('click', signOut);
+    profile = userSnapshot.data();
+    if (isSchoolUser && profile.role === 'visitor') {
+        await userRef.update({ role: 'user' });
+        return 'user';
+    }
 
-// Check route protection on initial script load
-auth.onAuthStateChanged((user) => {
-    if (!user && window.location.pathname.startsWith('/admin')) {
-        window.location.href = '/';
+    return profile.role || 'visitor';
+}
+
+function enforceRouteAccess(role) {
+    const path = window.location.pathname;
+    const isAdminRoute = path.startsWith('/admin');
+    const isAppRoute = path.startsWith('/app');
+
+    if (isAdminRoute && role !== 'admin') {
+        window.location.replace('/');
+    } else if (isAppRoute && role !== 'user' && role !== 'admin') {
+        window.location.replace('/');
+    } else if (isAppRoute) {
+        appMain.hidden = false;
+    }
+}
+
+initializeAppShell();
+
+auth.onAuthStateChanged(async (user) => {
+    renderHeader(user);
+    if (!user) {
+        renderSidebar('visitor');
+        enforceRouteAccess('visitor');
+        return;
+    }
+
+    try {
+        const role = await ensureUserProfile(user);
+        renderSidebar(role);
+        enforceRouteAccess(role);
+    } catch (error) {
+        console.error('Failed to load or create the user profile:', error);
+        showToast('Nem sikerült betölteni a felhasználói jogosultságokat.', 'error');
+        renderSidebar('visitor');
+        enforceRouteAccess('visitor');
     }
 });
+})();

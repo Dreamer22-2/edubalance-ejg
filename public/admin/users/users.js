@@ -1,12 +1,6 @@
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
-    auth.useEmulator("http://127.0.0.1:9099");
-    db.useEmulator("127.0.0.1", 8080);
-}
-
-const loadingMsg = document.getElementById('loading-msg');
 const adminContent = document.getElementById('admin-content');
 const usersTableBody = document.getElementById('users-table-body');
 const searchInput = document.getElementById('user-search-input');
@@ -22,14 +16,7 @@ auth.onAuthStateChanged((user) => {
     db.collection('users').doc(user.uid).get()
     .then((doc) => {
         if (doc.exists && doc.data().role === 'admin') {
-            loadingMsg.style.display = 'none';
             adminContent.style.display = 'block';
-            
-            if (typeof initAdminSidebar === 'function') {
-                initAdminSidebar('users', (targetRoute) => {
-                    window.location.href = targetRoute === 'users' ? '/admin/users/' : '/admin/';
-                });
-            }
 
             loadAllUsers();
         } else {
@@ -106,6 +93,7 @@ function renderTable(users) {
             </td>
             <td>
                 <select id="role-${userId}" onclick="event.stopPropagation()">
+                    <option value="visitor" ${userData.role === 'visitor' ? 'selected' : ''}>visitor</option>
                     <option value="user" ${userData.role === 'user' ? 'selected' : ''}>user</option>
                     <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>admin</option>
                 </select>
