@@ -181,3 +181,97 @@ font-weight: 500;
     font-size: 0.85rem;
     color: #4a5568;
 }
+
+/* =========================================================================
+   ADMIN STYLES
+   ========================================================================= */
+
+.admin-container {
+    max-width: 900px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 20px;
+    color: #2ed591;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+.admin-menu {
+    margin-top: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+}
+
+.admin-link-btn {
+    background-color: #2ed591;
+    color: #0f1411;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-block;
+    transition: transform 0.2s;
+}
+
+.admin-link-btn:hover {
+    transform: translateY(-2px);
+    background-color: #25b379;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.95rem;
+}
+
+th {
+    background: rgba(46, 213, 145, 0.1);
+    color: #2ed591;
+    font-weight: 600;
+}
+
+tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+select {
+    background: #0f1411;
+    color: #e2e8f0;
+    border: 1px solid rgba(113, 128, 150, 0.4);
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+.save-btn {
+    background-color: #2ed591;
+    color: #0f1411;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.save-btn:hover {
+    background-color: #25b379;
+}

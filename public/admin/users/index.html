@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBalance - Felhasználók kezelése</title>
+    <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+
+    <div class="container admin-container">
+        <a href="/admin" class="back-link">&larr; Vissza az admin főoldalra</a>
+        <div class="status-text" style="font-size: 2rem;">Felhasználók kezelése</div>
+        <div class="tagline">Adminisztrációs felület</div>
+
+        <div id="loading-msg" class="text-muted" style="margin-top: 20px;">Jogosultság ellenőrzése és adatok betöltése...</div>
+
+        <div id="admin-content" style="display: none;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Név</th>
+                        <th>Email</th>
+                        <th>Szerepkör (Role)</th>
+                        <th>Művelet</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body">
+                    <!-- Dynamic user rows injected via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/__/firebase/10.13.0/firebase-app-compat.js"></script>
+    <script src="/__/firebase/10.13.0/firebase-auth-compat.js"></script>
+    <script src="/__/firebase/10.13.0/firebase-firestore-compat.js"></script>
+    <script src="/__/firebase/init.js?useEmulator=true"></script>
+    <script src="users.js"></script>
+</body>
+</html>

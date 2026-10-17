@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBalance - Adminisztráció</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+    <div class="container">
+        <div class="status-text title-large">Admin Főoldal</div>
+        <div class="tagline">Üdvözlünk az admin panelen</div>
+        <p id="admin-welcome-text">Jogosultság ellenőrzése...</p>
+
+        <div class="admin-menu" id="admin-nav" style="display: none;">
+            <a href="/admin/users" class="admin-link-btn">Felhasználók kezelése</a>
+            <a href="/" class="btn btn-logout" style="margin-top: 20px; display: inline-block; text-decoration: none;">Vissza a főoldalra</a>
+        </div>
+    </div>
+
+    <script src="/__/firebase/10.13.0/firebase-app-compat.js"></script>
+    <script src="/__/firebase/10.13.0/firebase-auth-compat.js"></script>
+    <script src="/__/firebase/10.13.0/firebase-firestore-compat.js"></script>
+    <script src="/__/firebase/init.js?useEmulator=true"></script>
+    <script src="script.js"></script>
+</body>
+</html>
