@@ -24,11 +24,19 @@ function renderSidebar(role) {
         { label: 'Admin Konzol', href: '/admin/' },
         { label: 'Felhasználók', href: '/admin/users/', subpage: true }
     ];
-    const renderLink = (link) => `
-        <a class="sidebar-link${link.subpage ? ' sidebar-sublink' : ''}${link.href === activeRoute ? ' active' : ''}" href="${link.href}">
-            ${link.label}
+    const renderLink = (link) => {
+        const icon = link.href === '/'
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>'
+            : link.subpage
+                ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2z"/></svg>'
+            : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V8l6-4 6 4v12M9 20v-6h6v6M9 9h.01M15 9h.01"/></svg>';
+        return `
+        <a class="sidebar-link${link.subpage ? ' sidebar-sublink' : ''}${link.href === activeRoute ? ' active' : ''}" href="${link.href}" aria-label="${link.label}"${link.href === activeRoute ? ' aria-current="page"' : ''}>
+            ${icon}
+            <span>${link.label}</span>
         </a>
     `;
+    };
 
     sidebar.innerHTML = `
         <a class="sidebar-logo" href="/" aria-label="EduBalance kezdőlap">
