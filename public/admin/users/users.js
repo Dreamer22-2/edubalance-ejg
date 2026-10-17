@@ -234,7 +234,7 @@ function renderTable(users) {
                 <span>${userData.name || 'N/A'}</span>
             </td>
             <td>
-                <div style="display: flex; align-items: center; gap: 8px;">
+                <div class="user-email-cell">
                     <span>${userData.email || 'N/A'}</span>
                     ${userData.email ? `<button class="save-btn copy-btn" onclick="copyToClipboard('${userData.email}', 'Email másolva', event)" title="Email másolása">Másolás</button>` : ''}
                 </div>
@@ -257,11 +257,17 @@ function renderTable(users) {
             <td colspan="4">
                 <div class="details-wrapper" style="background-color: ${rowBgColor};">
                     <div class="details-content">
+                        ${userData.email ? `
+                        <div class="user-details-email">
+                            <strong>Email:</strong>
+                            <span>${userData.email}</span>
+                            <button class="save-btn copy-btn" onclick="copyToClipboard('${userData.email}', 'Email másolva', event)" title="Email másolása">Másolás</button>
+                        </div>` : ''}
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <strong>UUID:</strong> <span>${userId}</span>
                             <button class="save-btn copy-btn" onclick="copyToClipboard('${userId}', 'UUID másolva', event)" title="UUID másolása">Másolás</button>
                         </div>
-                        <div style="margin-top: 6px;"><strong>Létrehozva:</strong> ${createdAtFormatted}</div>
+                        <div class="user-details-created"><strong>Létrehozva:</strong> ${createdAtFormatted}</div>
                     </div>
                 </div>
             </td>

@@ -26,12 +26,12 @@ function renderSidebar(role) {
     ];
     const renderLink = (link) => {
         const icon = link.href === '/'
-            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>'
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></svg>'
             : link.subpage
                 ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2z"/></svg>'
-            : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V8l6-4 6 4v12M9 20v-6h6v6M9 9h.01M15 9h.01"/></svg>';
+                : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V8l6-4 6 4v12"/><path d="M9 20v-6h6v6M9 9h.01M15 9h.01"/></svg>';
         return `
-        <a class="sidebar-link${link.subpage ? ' sidebar-sublink' : ''}${link.href === activeRoute ? ' active' : ''}" href="${link.href}" aria-label="${link.label}"${link.href === activeRoute ? ' aria-current="page"' : ''}>
+        <a class="sidebar-link${link.subpage ? ' sidebar-sublink' : ''}${link.href === activeRoute ? ' active' : ''}" href="${link.href}"${link.href === activeRoute ? ' aria-current="page"' : ''}>
             ${icon}
             <span>${link.label}</span>
         </a>
@@ -66,23 +66,36 @@ function renderHeader(user) {
     const loginButton = header.querySelector('#login-btn');
     const userSection = header.querySelector('#user-section');
     const userImage = header.querySelector('#user-img');
+    const userMonogram = header.querySelector('#user-monogram');
     const userName = header.querySelector('#user-name');
+    const profileMenuButton = header.querySelector('#profile-menu-btn');
+    const profileMenu = header.querySelector('#profile-menu');
 
+    profileMenu.hidden = true;
+    profileMenuButton.setAttribute('aria-expanded', 'false');
     if (!user) {
         loginButton.hidden = false;
         userSection.hidden = true;
         return;
     }
 
+    const displayName = user.displayName || user.email || 'Bejelentkezett felhasználó';
+    const nameParts = displayName.trim().split(/\s+/).filter(Boolean);
     loginButton.hidden = true;
     userSection.hidden = false;
-    userName.textContent = user.displayName || user.email || 'Bejelentkezett felhasználó';
+    userName.textContent = displayName;
+    profileMenuButton.setAttribute('aria-label', `${displayName} profilmenü`);
+    userMonogram.textContent = nameParts.length > 1
+        ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toLocaleUpperCase('hu-HU')
+        : (nameParts[0] || '?').slice(0, 2).toLocaleUpperCase('hu-HU');
     if (user.photoURL) {
         userImage.src = user.photoURL;
         userImage.hidden = false;
+        userMonogram.hidden = true;
     } else {
         userImage.removeAttribute('src');
         userImage.hidden = true;
+        userMonogram.hidden = false;
     }
 }
 
@@ -92,22 +105,34 @@ function initializeAppShell() {
     appLayout.insertAdjacentHTML('afterbegin', '<aside class="admin-sidebar"></aside>');
     appMain.insertAdjacentHTML('afterbegin', `
         <header class="site-header">
-            <div class="site-header-title"></div>
+            <div class="site-header-brand">
+                <div class="site-header-title"></div>
+                <a class="site-header-logo" href="/" aria-label="EduBalance kezdőlap">
+                    <img src="/logo.png" alt="EduBalance">
+                </a>
+            </div>
             <div class="header-account">
                 <button id="login-btn" class="btn btn-login" type="button">Belépés Google-fiókkal</button>
                 <div id="user-section" class="header-user" hidden>
-                    <img id="user-img" alt="" hidden>
-                    <span id="user-name"></span>
-                    <button id="logout-btn" class="btn btn-logout" type="button">Kijelentkezés</button>
+                    <button id="profile-menu-btn" class="profile-menu-trigger" type="button" aria-label="Profilmenü" aria-expanded="false" aria-controls="profile-menu">
+                        <img id="user-img" alt="" hidden>
+                        <span id="user-monogram" class="user-monogram" hidden></span>
+                    </button>
+                    <div id="profile-menu" class="profile-menu" hidden>
+                        <div id="user-name" class="profile-menu-name"></div>
+                        <button id="profile-page-btn" class="profile-menu-item" type="button" disabled>Profil — hamarosan</button>
+                        <button id="logout-btn" class="profile-menu-item" type="button">Kijelentkezés</button>
+                    </div>
                 </div>
             </div>
         </header>
     `);
+    const titleHeader = pageTitle?.closest('.admin-header');
     if (pageTitle) {
         const titleContainer = appMain.querySelector('.site-header-title');
         titleContainer.appendChild(pageTitle);
         pageTitle.classList.add('site-page-title');
-        pageTitle.closest('.admin-header')?.remove();
+        titleHeader?.remove();
         if (appMain.querySelector('#member-content')) pageTitle.hidden = true;
     }
     const scrollContent = document.createElement('div');
@@ -117,7 +142,29 @@ function initializeAppShell() {
     });
     appMain.appendChild(scrollContent);
 
+    const userImage = appMain.querySelector('#user-img');
+    const userMonogram = appMain.querySelector('#user-monogram');
+    userImage.addEventListener('error', () => {
+        userImage.hidden = true;
+        userMonogram.hidden = false;
+    });
+
     const siteHeader = appMain.querySelector('.site-header');
+    const titleContainer = appMain.querySelector('.site-header-title');
+    const mobileLayout = window.matchMedia('(max-width: 720px)');
+    const updateResponsiveTitle = () => {
+        if (!pageTitle) return;
+        if (mobileLayout.matches) {
+            scrollContent.prepend(pageTitle);
+            pageTitle.classList.add('mobile-page-title');
+        } else {
+            titleContainer.appendChild(pageTitle);
+            pageTitle.classList.remove('mobile-page-title');
+        }
+    };
+    mobileLayout.addEventListener('change', updateResponsiveTitle);
+    updateResponsiveTitle();
+
     const updateHeaderScrollState = () => {
         siteHeader.classList.toggle('is-scrolled', scrollContent.scrollTop > 0);
     };
@@ -137,6 +184,24 @@ function initializeAppShell() {
             console.error('Sign out failed:', error);
             showToast('Nem sikerült kijelentkezni.', 'error');
         });
+    });
+
+    const profileMenuButton = appMain.querySelector('#profile-menu-btn');
+    const profileMenu = appMain.querySelector('#profile-menu');
+    const setProfileMenuOpen = (isOpen) => {
+        profileMenu.hidden = !isOpen;
+        profileMenuButton.setAttribute('aria-expanded', String(isOpen));
+    };
+    profileMenuButton.addEventListener('click', () => {
+        setProfileMenuOpen(profileMenu.hidden);
+    });
+    document.addEventListener('click', (event) => {
+        if (!profileMenu.contains(event.target) && !profileMenuButton.contains(event.target)) {
+            setProfileMenuOpen(false);
+        }
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') setProfileMenuOpen(false);
     });
 
     renderSidebar('visitor');
