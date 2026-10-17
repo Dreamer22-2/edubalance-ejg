@@ -23,8 +23,8 @@ auth.onAuthStateChanged((user) => {
             adminContent.style.display = 'block';
             loadAllUsers();
         } else {
-            alert("Nincs jogosultságod az oldal megtekintéséhez!");
-            window.location.href = '/';
+            showToast("Nincs jogosultságod az oldal megtekintéséhez!", "error");
+            setTimeout(() => { window.location.href = '/'; }, 1500);
         }
     })
     .catch((error) => {
@@ -47,10 +47,15 @@ function loadAllUsers() {
                 createdAtFormatted = date.toLocaleString('hu-HU');
             }
 
+            const userImg = userData.photoURL || 'https://via.placeholder.com/35';
+
             const trMain = document.createElement('tr');
             trMain.className = 'user-main-row';
             trMain.innerHTML = `
-                <td>${userData.name || 'N/A'}</td>
+                <td style="display: flex; align-items: center; gap: 12px;">
+                    <img src="${userImg}" alt="Profilkép" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 1px solid #2ed591; flex-shrink: 0;">
+                    <span>${userData.name || 'N/A'}</span>
+                </td>
                 <td>${userData.email || 'N/A'}</td>
                 <td>
                     <select id="role-${userId}" onclick="event.stopPropagation()">
@@ -69,7 +74,7 @@ function loadAllUsers() {
                 <td colspan="4">
                     <div class="details-wrapper">
                         <div class="details-content">
-                            <img src="${userData.photoURL || 'https://via.placeholder.com/45'}" alt="Profilkép" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #2ed591;">
+                            <img src="${userImg}" alt="Profilkép" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #2ed591;">
                             <div>
                                 <div><strong>UUID:</strong> ${userId}</div>
                                 <div style="margin-top: 5px;"><strong>Létrehozva:</strong> ${createdAtFormatted}</div>
@@ -89,7 +94,7 @@ function loadAllUsers() {
     })
     .catch((error) => {
         console.error("Error fetching users:", error);
-        alert("Hiba történt a felhasználók betöltése közben.");
+        showToast("Hiba történt a felhasználók betöltése közben.", "error");
     });
 }
 
@@ -100,10 +105,10 @@ window.updateUserRole = function(userId) {
         role: selectedRole
     })
     .then(() => {
-        alert("Szerepkör sikeresen frissítve!");
+        showToast("Szerepkör sikeresen frissítve!", "success");
     })
     .catch((error) => {
         console.error("Error updating role:", error);
-        alert("Hiba a mentés során: " + error.message);
+        showToast("Hiba a mentés során: " + error.message, "error");
     });
 };
