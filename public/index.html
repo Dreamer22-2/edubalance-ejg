@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduBalance - Kezdőlap</title>
+    <title>EduBalance</title>
+    <link rel="icon" type="image/png" href="/logo.png">
     <link rel="stylesheet" href="/style.css">
     <script src="/toast.js"></script>
 </head>
@@ -11,15 +12,24 @@
 
     <div class="admin-layout app-layout">
         <main class="admin-main landing-main">
-            <section class="container landing-card">
-                <img src="/logo.png" alt="EduBalance logo" class="logo">
-                <div class="status-text">Fejlesztés alatt</div>
-                <h1>EduBalance</h1>
-                <div class="tagline">Hamarosan érkezünk</div>
+            <section id="visitor-content" class="landing-card">
+                <header class="landing-heading">
+                    <div class="status-text">Fejlesztés alatt</div>
+                    <div class="tagline">Hamarosan érkezünk</div>
+                </header>
                 <p>
                     Gőzerővel dolgozunk a projekten, amely segít megteremteni a tökéletes egyensúlyt a tanulás és a mindennapok között. Weboldalunk jelenleg fejlesztés alatt áll, de hamarosan elindulunk.
                 </p>
                 <div class="footer">&copy; 2026 EduBalance. Minden jog fenntartva.</div>
+            </section>
+            <section id="member-content" hidden>
+                <header class="admin-header">
+                    <h1>EduBalance</h1>
+                </header>
+                <section id="app-content" class="app-card">
+                    <h2>Hamarosan</h2>
+                    <p>Az EduBalance alkalmazás funkciói fejlesztés alatt állnak.</p>
+                </section>
             </section>
         </main>
     </div>

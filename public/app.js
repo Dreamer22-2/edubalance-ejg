@@ -10,27 +10,44 @@ function getActiveRoute() {
     const path = window.location.pathname;
     if (path.startsWith('/admin/users')) return '/admin/users/';
     if (path.startsWith('/admin')) return '/admin/';
-    if (path.startsWith('/app')) return '/app/';
     return '/';
 }
 
 function renderSidebar(role) {
     const sidebar = appLayout.querySelector('.admin-sidebar');
     const activeRoute = getActiveRoute();
-    const links = [
-        { label: 'Kezdőlap', href: '/', roles: ['visitor', 'user', 'admin'] },
-        { label: 'Alkalmazás', href: '/app/', roles: ['user', 'admin'] },
-        { label: 'Admin áttekintés', href: '/admin/', roles: ['admin'] },
-        { label: 'Felhasználók', href: '/admin/users/', roles: ['admin'] }
+    const generalLinks = [
+        { label: 'EduBalance', href: '/', roles: ['visitor', 'user', 'admin'] }
     ];
+    const adminLinks = [
+        { label: 'Admin Konzol', href: '/admin/' },
+        { label: 'Felhasználók', href: '/admin/users/', subpage: true }
+    ];
+    const renderLink = (link) => `
+        <a class="sidebar-link${link.subpage ? ' sidebar-sublink' : ''}${link.href === activeRoute ? ' active' : ''}" href="${link.href}">
+            ${link.label}
+        </a>
+    `;
 
     sidebar.innerHTML = `
-        <h2>EduBalance</h2>
+        <a class="sidebar-logo" href="/" aria-label="EduBalance kezdőlap">
+            <img src="/logo.png" alt="EduBalance">
+        </a>
         <nav class="sidebar-nav" aria-label="Fő navigáció">
-            ${links
-                .filter((link) => link.roles.includes(role))
-                .map((link) => `<a class="sidebar-link${link.href === activeRoute ? ' active' : ''}" href="${link.href}">${link.label}</a>`)
-                .join('')}
+            <div class="sidebar-main-links">
+                ${generalLinks
+                    .filter((link) => link.roles.includes(role))
+                    .map(renderLink)
+                    .join('')}
+            </div>
+            ${role === 'admin' ? `
+                <section class="sidebar-admin-section" aria-labelledby="sidebar-admin-heading">
+                    <h3 id="sidebar-admin-heading">Adminisztráció</h3>
+                    <div class="sidebar-admin-links">
+                        ${adminLinks.map(renderLink).join('')}
+                    </div>
+                </section>
+            ` : ''}
         </nav>
     `;
 }
@@ -128,15 +145,23 @@ async function ensureUserProfile(user) {
 function enforceRouteAccess(role) {
     const path = window.location.pathname;
     const isAdminRoute = path.startsWith('/admin');
-    const isAppRoute = path.startsWith('/app');
 
     if (isAdminRoute && role !== 'admin') {
         window.location.replace('/');
-    } else if (isAppRoute && role !== 'user' && role !== 'admin') {
+    } else if (path.startsWith('/app')) {
         window.location.replace('/');
-    } else if (isAppRoute) {
-        appMain.hidden = false;
     }
+}
+
+function renderHomeForRole(role) {
+    const visitorContent = appMain.querySelector('#visitor-content');
+    const memberContent = appMain.querySelector('#member-content');
+    if (!visitorContent || !memberContent) return;
+
+    const isMember = role === 'user' || role === 'admin';
+    visitorContent.hidden = isMember;
+    memberContent.hidden = !isMember;
+    document.title = 'EduBalance';
 }
 
 initializeAppShell();
@@ -145,6 +170,7 @@ auth.onAuthStateChanged(async (user) => {
     renderHeader(user);
     if (!user) {
         renderSidebar('visitor');
+        renderHomeForRole('visitor');
         enforceRouteAccess('visitor');
         return;
     }
@@ -152,11 +178,13 @@ auth.onAuthStateChanged(async (user) => {
     try {
         const role = await ensureUserProfile(user);
         renderSidebar(role);
+        renderHomeForRole(role);
         enforceRouteAccess(role);
     } catch (error) {
         console.error('Failed to load or create the user profile:', error);
         showToast('Nem sikerült betölteni a felhasználói jogosultságokat.', 'error');
         renderSidebar('visitor');
+        renderHomeForRole('visitor');
         enforceRouteAccess('visitor');
     }
 });

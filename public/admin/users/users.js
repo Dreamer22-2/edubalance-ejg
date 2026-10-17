@@ -88,7 +88,7 @@ function renderTable(users) {
             <td>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span>${userData.email || 'N/A'}</span>
-                    ${userData.email ? `<button class="copy-btn" onclick="copyToClipboard('${userData.email}', 'Email másolva', event)" title="Email másolása" style="background:none; border:none; cursor:pointer; color:#2ed591; font-size: 0.85rem;">📋</button>` : ''}
+                    ${userData.email ? `<button class="save-btn copy-btn" onclick="copyToClipboard('${userData.email}', 'Email másolva', event)" title="Email másolása">Másolás</button>` : ''}
                 </div>
             </td>
             <td>
@@ -111,7 +111,7 @@ function renderTable(users) {
                     <div class="details-content">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <strong>UUID:</strong> <span>${userId}</span>
-                            <button class="copy-btn" onclick="copyToClipboard('${userId}', 'UUID másolva', event)" title="UUID másolása" style="background:none; border:none; cursor:pointer; color:#2ed591; font-size: 0.85rem;">📋</button>
+                            <button class="save-btn copy-btn" onclick="copyToClipboard('${userId}', 'UUID másolva', event)" title="UUID másolása">Másolás</button>
                         </div>
                         <div style="margin-top: 6px;"><strong>Létrehozva:</strong> ${createdAtFormatted}</div>
                     </div>
