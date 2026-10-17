@@ -24,6 +24,13 @@ auth.onAuthStateChanged((user) => {
         if (doc.exists && doc.data().role === 'admin') {
             loadingMsg.style.display = 'none';
             adminContent.style.display = 'block';
+            
+            if (typeof initAdminSidebar === 'function') {
+                initAdminSidebar('users', (targetRoute) => {
+                    window.location.href = targetRoute === 'users' ? '/admin/users/' : '/admin/';
+                });
+            }
+
             loadAllUsers();
         } else {
             showToast("Nincs jogosultságod az oldal megtekintéséhez!", "error");
@@ -94,7 +101,7 @@ function renderTable(users) {
             <td>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span>${userData.email || 'N/A'}</span>
-                    ${userData.email ? `<button class="copy-btn" onclick="copyToClipboard('${userData.email}', 'Email másolva', event)" title="Email másolása" style="background:none; border:none; cursor:pointer; color:#2ed591; font-size: 0.85rem;"><i class="fas fa-copy"></i>📋</button>` : ''}
+                    ${userData.email ? `<button class="copy-btn" onclick="copyToClipboard('${userData.email}', 'Email másolva', event)" title="Email másolása" style="background:none; border:none; cursor:pointer; color:#2ed591; font-size: 0.85rem;">📋</button>` : ''}
                 </div>
             </td>
             <td>
