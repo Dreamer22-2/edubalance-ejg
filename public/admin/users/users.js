@@ -37,9 +37,13 @@ function loadAllUsers() {
     db.collection('users').get()
     .then((querySnapshot) => {
         usersTableBody.innerHTML = '';
+        let index = 0;
+        
         querySnapshot.forEach((doc) => {
             const userData = doc.data();
             const userId = doc.id;
+            const isEven = index % 2 === 0;
+            index++;
 
             let createdAtFormatted = 'N/A';
             if (userData.createdAt) {
@@ -48,9 +52,13 @@ function loadAllUsers() {
             }
 
             const userImg = userData.photoURL || 'https://via.placeholder.com/35';
+            
+            // Zebra striping background tones
+            const rowBgColor = isEven ? 'rgba(255, 255, 255, 0.015)' : 'rgba(255, 255, 255, 0.045}';
 
             const trMain = document.createElement('tr');
             trMain.className = 'user-main-row';
+            trMain.style.backgroundColor = rowBgColor;
             trMain.innerHTML = `
                 <td style="display: flex; align-items: center; gap: 12px;">
                     <img src="${userImg}" alt="Profilkép" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 1px solid #2ed591; flex-shrink: 0;">
@@ -72,13 +80,10 @@ function loadAllUsers() {
             trDetails.className = 'user-details-row';
             trDetails.innerHTML = `
                 <td colspan="4">
-                    <div class="details-wrapper">
+                    <div class="details-wrapper" style="background-color: ${rowBgColor};">
                         <div class="details-content">
-                            <img src="${userImg}" alt="Profilkép" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #2ed591;">
-                            <div>
-                                <div><strong>UUID:</strong> ${userId}</div>
-                                <div style="margin-top: 5px;"><strong>Létrehozva:</strong> ${createdAtFormatted}</div>
-                            </div>
+                            <div><strong>UUID:</strong> ${userId}</div>
+                            <div style="margin-top: 6px;"><strong>Létrehozva:</strong> ${createdAtFormatted}</div>
                         </div>
                     </div>
                 </td>

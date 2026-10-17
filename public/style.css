@@ -357,3 +357,40 @@ select {
     background-color: #ff4757;
     color: #ffffff;
 }
+
+/* =========================================================================
+   SEAMLESS EXPANDABLE TABLE ROWS & ZEBRA STRIPING
+   ========================================================================= */
+
+.user-main-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.user-details-row td {
+    padding: 0 !important;
+    border-bottom: none !important;
+}
+
+.details-wrapper {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    padding: 0 20px;
+}
+
+.user-details-row.expanded .details-wrapper {
+    max-height: 120px; /* Adjust if content needs more vertical space */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.details-content {
+    padding: 15px 0;
+    opacity: 0;
+    transition: opacity 0.2s ease-in;
+}
+
+.user-details-row.expanded .details-content {
+    opacity: 1;
+    transition-delay: 0.1s;
+}
