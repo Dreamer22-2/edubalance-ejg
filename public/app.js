@@ -6,6 +6,7 @@ const appMain = appLayout?.querySelector('.admin-main');
 const pageTitle = appMain?.querySelector('.admin-header h1');
 
 const schoolEmailPattern = /@e5vos\.hu$/i;
+const privilegedRoles = ['admin', 'dev', 'owner'];
 
 function getActiveRoute() {
     const path = window.location.pathname;
@@ -18,7 +19,7 @@ function renderSidebar(role) {
     const sidebar = appLayout.querySelector('.admin-sidebar');
     const activeRoute = getActiveRoute();
     const generalLinks = [
-        { label: 'Főoldal', href: '/', roles: ['visitor', 'user', 'admin'] }
+        { label: 'Főoldal', href: '/', roles: ['visitor', 'user', ...privilegedRoles] }
     ];
     const adminLinks = [
         { label: 'Admin Konzol', href: '/admin/' },
@@ -49,7 +50,7 @@ function renderSidebar(role) {
                     .map(renderLink)
                     .join('')}
             </div>
-            ${role === 'admin' ? `
+            ${privilegedRoles.includes(role) ? `
                 <section class="sidebar-admin-section" aria-labelledby="sidebar-admin-heading">
                     <h3 id="sidebar-admin-heading">Adminisztráció</h3>
                     <div class="sidebar-admin-links">
@@ -246,7 +247,7 @@ function enforceRouteAccess(role) {
     const path = window.location.pathname;
     const isAdminRoute = path.startsWith('/admin');
 
-    if (isAdminRoute && role !== 'admin') {
+    if (isAdminRoute && !privilegedRoles.includes(role)) {
         window.location.replace('/');
     } else if (path.startsWith('/app')) {
         window.location.replace('/');
@@ -258,7 +259,7 @@ function renderHomeForRole(role) {
     const memberContent = appMain.querySelector('#member-content');
     if (!visitorContent || !memberContent) return;
 
-    const isMember = role === 'user' || role === 'admin';
+    const isMember = role === 'user' || privilegedRoles.includes(role);
     visitorContent.hidden = isMember;
     memberContent.hidden = !isMember;
     if (pageTitle) pageTitle.hidden = !isMember;

@@ -12,8 +12,11 @@ const listStatus = document.getElementById('users-list-status');
 const PAGE_SIZE = 20;
 const CACHE_MAX_USERS = 200;
 const CACHE_MAX_AGE_MS = 10 * 60 * 1000;
+const privilegedRoles = ['admin', 'dev', 'owner'];
+const availableRoles = ['visitor', 'user', 'admin', 'dev', 'owner'];
 let allUsersData = [];
 let adminUid;
+let adminRole;
 let lastDocumentId = null;
 let hasMoreUsers = true;
 let isLoadingUsers = false;
@@ -29,9 +32,10 @@ auth.onAuthStateChanged((user) => {
 
     db.collection('users').doc(user.uid).get()
     .then((doc) => {
-        if (doc.exists && doc.data().role === 'admin') {
+        if (doc.exists && privilegedRoles.includes(doc.data().role)) {
             adminContent.style.display = 'block';
             adminUid = user.uid;
+            adminRole = doc.data().role;
             initializeUserList();
         } else {
             showToast("Nincs jogosultságod az oldal megtekintéséhez!", "error");
@@ -214,6 +218,14 @@ function renderTable(users) {
     
     users.forEach((userData, index) => {
         const userId = userData.id;
+        const isOwnerProfile = userData.role === 'owner';
+        const isCurrentUser = userId === adminUid;
+        const canEditOwnerRole = isOwnerProfile && isCurrentUser;
+        const canPromoteToOwner = adminRole === 'owner';
+        const roleOptions = availableRoles.map((role) => {
+            const isDisabled = role === 'owner' && !canPromoteToOwner;
+            return `<option value="${role}" ${userData.role === role ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}>${role}</option>`;
+        }).join('');
         const isEven = index % 2 === 0;
 
         let createdAtFormatted = 'N/A';
@@ -240,19 +252,17 @@ function renderTable(users) {
                 </div>
             </td>
             <td>
-                <select id="role-${userId}" onclick="event.stopPropagation()">
-                    <option value="visitor" ${userData.role === 'visitor' ? 'selected' : ''}>visitor</option>
-                    <option value="user" ${userData.role === 'user' ? 'selected' : ''}>user</option>
-                    <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>admin</option>
+                <select id="role-${userId}" onclick="event.stopPropagation()" ${isOwnerProfile && !canEditOwnerRole ? 'disabled title="Másik tulajdonos szerepköre nem módosítható."' : ''}>
+                    ${roleOptions}
                 </select>
             </td>
             <td onclick="event.stopPropagation()">
                 <div class="user-actions">
-                    <button class="save-btn" onclick="updateUserRole('${userId}')">Mentés</button>
+                    <button class="save-btn" onclick="updateUserRole('${userId}')" ${isOwnerProfile && !canEditOwnerRole ? 'disabled title="Másik tulajdonos szerepköre nem módosítható."' : ''}>Mentés</button>
                     <button
                         class="delete-btn"
                         type="button"
-                        ${userId === adminUid ? 'disabled title="A saját admin fiókod nem törölhető innen."' : `onclick="deleteUserProfile('${userId}', event)"`}
+                        ${isOwnerProfile ? 'disabled title="A tulajdonosi profil nem törölhető innen."' : isCurrentUser ? 'disabled title="A saját admin fiókod nem törölhető innen."' : `onclick="deleteUserProfile('${userId}', event)"`}
                     >Törlés</button>
                 </div>
             </td>
@@ -300,18 +310,37 @@ window.copyToClipboard = function(text, successMessage, event) {
 };
 
 window.updateUserRole = function(userId) {
+    const user = allUsersData.find((entry) => entry.id === userId);
+    if (!user) {
+        showToast('A felhasználó már nincs a betöltött listában. Frissítsd a listát.', 'error');
+        return;
+    }
+
+    if (user.role === 'owner' && userId !== adminUid) {
+        showToast('Másik tulajdonos szerepköre nem módosítható.', 'error');
+        return;
+    }
+
     const selectedRole = document.getElementById(`role-${userId}`).value;
+    if (selectedRole === 'owner' && adminRole !== 'owner') {
+        showToast('Csak egy tulajdonos adhat tulajdonosi szerepkört.', 'error');
+        return;
+    }
+    const shouldLeaveAdmin = userId === adminUid &&
+        privilegedRoles.includes(adminRole) &&
+        !privilegedRoles.includes(selectedRole);
 
     db.collection('users').doc(userId).update({
         role: selectedRole
     })
     .then(() => {
-        const user = allUsersData.find((entry) => entry.id === userId);
         if (user) {
             user.role = selectedRole;
             writeCachedUsers();
+            renderFilteredUsers();
         }
         showToast("Szerepkör sikeresen frissítve!", "success");
+        if (shouldLeaveAdmin) window.location.replace('/');
     })
     .catch((error) => {
         console.error("Error updating role:", error);
@@ -329,6 +358,10 @@ window.deleteUserProfile = async function(userId, event) {
     const user = allUsersData.find((entry) => entry.id === userId);
     if (!user) {
         showToast('A felhasználó már nincs a betöltött listában. Frissítsd a listát.', 'error');
+        return;
+    }
+    if (user.role === 'owner') {
+        showToast('A tulajdonosi profil nem törölhető.', 'error');
         return;
     }
 

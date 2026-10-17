@@ -1,5 +1,6 @@
 const auth = firebase.auth();
 const db = firebase.firestore();
+const privilegedRoles = ['admin', 'dev', 'owner'];
 
 auth.onAuthStateChanged((user) => {
     if (!user) {
@@ -9,8 +10,9 @@ auth.onAuthStateChanged((user) => {
 
     db.collection('users').doc(user.uid).get()
     .then((doc) => {
-        if (doc.exists && doc.data().role === 'admin') {
-            document.getElementById('admin-welcome-text').innerText = `Bejelentkezve mint: ${user.displayName} (Admin)`;
+        if (doc.exists && privilegedRoles.includes(doc.data().role)) {
+            const role = doc.data().role;
+            document.getElementById('admin-welcome-text').innerText = `Bejelentkezve mint: ${user.displayName} (${role})`;
             document.getElementById('admin-content').style.display = 'block';
         } else {
             alert("Nincs admin jogosultságod!");

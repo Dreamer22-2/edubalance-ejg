@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start Firebase Emulators",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"-y",
+				"firebase-tools@latest",
+				"emulators:start",
+				"--only",
+				"auth,firestore,hosting,ui"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}

@@ -13,11 +13,11 @@ service cloud.firestore {
     //   - name: string, required, 1-120 characters
     //   - email: string, required, valid email, at most 254 characters
     //   - photoURL: string, required, empty or HTTP(S) URL, at most 2048 characters
-    //   - role: string, required, one of visitor/user/admin
+    //   - role: string, required, one of visitor/user/admin/dev/owner
     //   - createdAt: timestamp, required, immutable
     //
     // This collection contains profile information. Users can read only their
-    // own profile; admins can list profiles for User Management.
+    // own profile; admin/dev/owner roles can list profiles for User Management.
     //
     // All other collections and documents are denied by default.
     // ===============================================================
@@ -54,9 +54,10 @@ service cloud.firestore {
         request.auth.token.email.matches('.*@[eE]5[vV][oO][sS][.][hH][uU]$');
     }
 
-    function isAdmin() {
+    function hasAdminAccess() {
       return isAuthenticated() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in
+          ['admin', 'dev', 'owner'];
     }
 
     function isValidUser(data, userId) {
@@ -74,7 +75,7 @@ service cloud.firestore {
         data.photoURL is string &&
         data.photoURL.size() <= 2048 &&
         (data.photoURL == '' || data.photoURL.matches('^https?://.+$')) &&
-        data.role in ['visitor', 'user', 'admin'] &&
+        data.role in ['visitor', 'user', 'admin', 'dev', 'owner'] &&
         data.createdAt is timestamp;
     }
 
@@ -86,7 +87,23 @@ service cloud.firestore {
     function isValidRoleUpdate(userId) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']) &&
         (
-          (isAdmin() && request.resource.data.role in ['visitor', 'user', 'admin']) ||
+          (
+            resource.data.role == 'owner' &&
+            isOwner(userId) &&
+            isDocOwner() &&
+            request.resource.data.role in ['visitor', 'user', 'admin', 'dev', 'owner']
+          ) ||
+          (
+            resource.data.role != 'owner' &&
+            hasAdminAccess() &&
+            request.resource.data.role in ['visitor', 'user', 'admin', 'dev']
+          ) ||
+          (
+            resource.data.role != 'owner' &&
+            hasAdminAccess() &&
+            request.resource.data.role == 'owner' &&
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner'
+          ) ||
           (
             isOwner(userId) &&
             isDocOwner() &&
@@ -98,8 +115,8 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
+      allow get: if isOwner(userId) || hasAdminAccess();
+      allow list: if hasAdminAccess();
 
       allow create: if isOwner(userId) &&
         uidUnchanged() &&
@@ -113,9 +130,11 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt &&
         isValidRoleUpdate(userId);
 
-      // Only admins may remove another user's Firestore profile. This does not
-      // delete the corresponding Firebase Authentication account.
-      allow delete: if isAdmin() && userId != request.auth.uid;
+      // Privileged roles may remove another user's Firestore profile, except
+      // owner profiles. This does not delete the Firebase Authentication account.
+      allow delete: if hasAdminAccess() &&
+        userId != request.auth.uid &&
+        resource.data.role != 'owner';
     }
   }
 }
