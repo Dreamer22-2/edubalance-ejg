@@ -68,6 +68,7 @@ function renderHeader(user) {
     const userImage = header.querySelector('#user-img');
     const userMonogram = header.querySelector('#user-monogram');
     const userName = header.querySelector('#user-name');
+    const headerUserName = header.querySelector('#header-user-name');
     const profileMenuButton = header.querySelector('#profile-menu-btn');
     const profileMenu = header.querySelector('#profile-menu');
 
@@ -84,6 +85,7 @@ function renderHeader(user) {
     loginButton.hidden = true;
     userSection.hidden = false;
     userName.textContent = displayName;
+    headerUserName.textContent = displayName;
     profileMenuButton.setAttribute('aria-label', `${displayName} profilmenü`);
     userMonogram.textContent = nameParts.length > 1
         ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toLocaleUpperCase('hu-HU')
@@ -112,8 +114,12 @@ function initializeAppShell() {
                 </a>
             </div>
             <div class="header-account">
-                <button id="login-btn" class="btn btn-login" type="button">Belépés Google-fiókkal</button>
+                <button id="login-btn" class="btn btn-login" type="button">
+                    <span class="login-label-full">Belépés Google-fiókkal</span>
+                    <span class="login-label-compact">Belépés</span>
+                </button>
                 <div id="user-section" class="header-user" hidden>
+                    <span id="header-user-name" class="header-user-name"></span>
                     <button id="profile-menu-btn" class="profile-menu-trigger" type="button" aria-label="Profilmenü" aria-expanded="false" aria-controls="profile-menu">
                         <img id="user-img" alt="" hidden>
                         <span id="user-monogram" class="user-monogram" hidden></span>
