@@ -27,8 +27,11 @@
                     <h1>EduBalance</h1>
                 </header>
                 <section id="app-content" class="app-card">
-                    <h2>Hamarosan</h2>
-                    <p>Az EduBalance alkalmazás funkciói fejlesztés alatt állnak.</p>
+                    <h2>Órarend</h2>
+                    <p id="timetable-help">Az órarend betöltéséhez töltsd ki az EJG-kódot és az OM azonosítót a profilodban.</p>
+                    <button id="load-timetable-btn" class="save-btn" type="button" disabled>Órarend betöltése</button>
+                    <p id="timetable-status" class="timetable-status" role="status" aria-live="polite"></p>
+                    <div id="timetable-results" class="timetable-results" hidden></div>
                 </section>
             </section>
         </main>
@@ -45,6 +48,7 @@
 
     <!-- 3. Automated Firebase Configuration Script -->
     <script src="/__/firebase/init.js"></script>
+    <script src="/__/firebase/10.13.0/firebase-functions-compat.js"></script>
     <script src="/firebase-emulators.js"></script>
 
     <script src="/app.js"></script>

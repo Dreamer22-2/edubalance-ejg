@@ -50,6 +50,16 @@ auth.onAuthStateChanged((user) => {
 
 function initializeUserList() {
     searchInput.addEventListener('input', renderFilteredUsers);
+    usersTableBody.addEventListener('click', (event) => {
+        const copyButton = event.target.closest('.profile-copy-btn');
+        if (copyButton) {
+            window.copyToClipboard(
+                copyButton.dataset.copyValue,
+                copyButton.dataset.successMessage,
+                event
+            );
+        }
+    });
     refreshButton.addEventListener('click', () => loadNextUserBatch(true));
     loadMoreButton.addEventListener('click', () => {
         automaticLoadingPaused = false;
@@ -79,7 +89,38 @@ function initializeUserList() {
 }
 
 function getCacheKey() {
-    return `edubalance-admin-users:${adminUid}`;
+    return `edubalance-admin-users:v4:${adminUid}`;
+}
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[character]);
+}
+
+function getMonogram(name) {
+    const nameParts = name.trim().split(/\s+/).filter(Boolean);
+    return nameParts.length > 1
+        ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toLocaleUpperCase('hu-HU')
+        : (nameParts[0] || '?').slice(0, 2).toLocaleUpperCase('hu-HU');
+}
+
+function renderProfileDetail(label, value, copyMessage) {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    const escapedValue = escapeHtml(value);
+    const copyButton = copyMessage
+        ? `<button class="save-btn copy-btn profile-copy-btn" type="button" data-copy-value="${escapedValue}" data-success-message="${copyMessage}" title="${copyMessage}">Másolás</button>`
+        : '';
+    return `<div class="user-details-profile-field"><strong>${label}:</strong><span>${escapedValue}</span>${copyButton}</div>`;
+}
+
+function getSchoolIdentifiers(user) {
+    const identifiers = user.schoolIdentifiers;
+    return identifiers && typeof identifiers === 'object' ? identifiers : {};
 }
 
 function readCachedUsers() {
@@ -99,7 +140,16 @@ function readCachedUsers() {
                 typeof user.id === 'string' &&
                 typeof user.name === 'string' &&
                 typeof user.email === 'string' &&
-                typeof user.role === 'string'
+                typeof user.role === 'string' &&
+                ['username'].every((field) =>
+                    user[field] === undefined || typeof user[field] === 'string'
+                ) &&
+                (user.schoolIdentifiers === undefined ||
+                    (user.schoolIdentifiers &&
+                        typeof user.schoolIdentifiers === 'object' &&
+                        ['ejgCode', 'omAzonosito'].every((field) =>
+                            typeof user.schoolIdentifiers[field] === 'string'
+                        )))
             );
         if (isValid) return cache;
 
@@ -147,8 +197,16 @@ function updateListControls() {
 function getFilteredUsers(term = searchInput.value.trim().toLowerCase()) {
     return allUsersData.filter((user) => {
         const name = (user.name || '').toLowerCase();
+        const username = (user.username || '').toLowerCase();
         const email = (user.email || '').toLowerCase();
-        return name.includes(term) || email.includes(term);
+        const schoolIdentifiers = getSchoolIdentifiers(user);
+        const ejgCode = (schoolIdentifiers.ejgCode || '').toLowerCase();
+        const omAzonosito = (schoolIdentifiers.omAzonosito || '').toLowerCase();
+        return name.includes(term) ||
+            username.includes(term) ||
+            email.includes(term) ||
+            ejgCode.includes(term) ||
+            omAzonosito.includes(term);
     });
 }
 
@@ -234,7 +292,17 @@ function renderTable(users) {
             createdAtFormatted = date.toLocaleString('hu-HU');
         }
 
-        const userImg = userData.photoURL || 'https://via.placeholder.com/35';
+        const username = typeof userData.username === 'string' ? userData.username.trim() : '';
+        const fullName = typeof userData.name === 'string' ? userData.name : '';
+        const primaryName = username || fullName || 'N/A';
+        const secondaryName = username && fullName && username !== fullName ? fullName : '';
+        const photoURL = typeof userData.photoURL === 'string' ? userData.photoURL.trim() : '';
+        const monogram = getMonogram(primaryName);
+        const schoolIdentifiers = getSchoolIdentifiers(userData);
+        const profileIdentifiers = [
+            renderProfileDetail('EJG-kód', schoolIdentifiers.ejgCode, 'EJG-kód másolva'),
+            renderProfileDetail('OM azonosító', schoolIdentifiers.omAzonosito, 'OM azonosító másolva')
+        ].join('');
         const rowBgColor = isEven ? 'rgba(255, 255, 255, 0.015)' : 'rgba(255, 255, 255, 0.045)';
 
         const trMain = document.createElement('tr');
@@ -242,8 +310,14 @@ function renderTable(users) {
         trMain.style.backgroundColor = rowBgColor;
         trMain.innerHTML = `
             <td style="display: flex; align-items: center; gap: 12px;">
-                <img src="${userImg}" alt="Profilkép" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 1px solid #2ed591; flex-shrink: 0;">
-                <span>${userData.name || 'N/A'}</span>
+                <span class="user-list-avatar" role="img" aria-label="${escapeHtml(primaryName)} profilképe">
+                    <img alt=""${photoURL ? ` src="${escapeHtml(photoURL)}"` : ' hidden'}>
+                    <span class="user-list-monogram"${photoURL ? ' hidden' : ''}>${escapeHtml(monogram)}</span>
+                </span>
+                <span class="user-list-name">
+                    <strong>${escapeHtml(primaryName)}</strong>
+                    ${secondaryName ? `<span>${escapeHtml(secondaryName)}</span>` : ''}
+                </span>
             </td>
             <td>
                 <div class="user-email-cell">
@@ -267,6 +341,12 @@ function renderTable(users) {
                 </div>
             </td>
         `;
+        const avatarImage = trMain.querySelector('.user-list-avatar img');
+        const avatarMonogram = trMain.querySelector('.user-list-monogram');
+        avatarImage.addEventListener('error', () => {
+            avatarImage.hidden = true;
+            avatarMonogram.hidden = false;
+        });
 
         const trDetails = document.createElement('tr');
         trDetails.className = 'user-details-row';
@@ -274,12 +354,15 @@ function renderTable(users) {
             <td colspan="4">
                 <div class="details-wrapper" style="background-color: ${rowBgColor};">
                     <div class="details-content">
+                        ${renderProfileDetail('Egyéni felhasználónév', userData.username)}
+                        ${renderProfileDetail('Teljes név', userData.name)}
                         ${userData.email ? `
                         <div class="user-details-email">
                             <strong>Email:</strong>
                             <span>${userData.email}</span>
                             <button class="save-btn copy-btn" onclick="copyToClipboard('${userData.email}', 'Email másolva', event)" title="Email másolása">Másolás</button>
                         </div>` : ''}
+                        ${profileIdentifiers ? `<div class="user-details-profile-fields">${profileIdentifiers}</div>` : ''}
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <strong>UUID:</strong> <span>${userId}</span>
                             <button class="save-btn copy-btn" onclick="copyToClipboard('${userId}', 'UUID másolva', event)" title="UUID másolása">Másolás</button>

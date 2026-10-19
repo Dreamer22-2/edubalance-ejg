@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil - EduBalance</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="stylesheet" href="/style.css">
+    <script src="/toast.js"></script>
+</head>
+<body>
+    <div id="toast-container"></div>
+
+    <div class="admin-layout app-layout">
+        <main class="admin-main">
+            <section id="profile-content" hidden>
+                <header class="admin-header">
+                    <h1>Profil</h1>
+                </header>
+                <section class="profile-settings">
+                    <h2>Fiókbeállítások</h2>
+                    <p class="profile-full-name">
+                        <span>Teljes név</span>
+                        <strong id="profile-full-name">Betöltés...</strong>
+                    </p>
+                    <form id="profile-form">
+                        <fieldset id="profile-fields" class="profile-fields" disabled>
+                            <label>
+                                Egyéni felhasználónév
+                                <input id="profile-username" name="username" type="text" maxlength="40" autocomplete="nickname">
+                            </label>
+                            <label>
+                                EJG-kód
+                                <input id="profile-ejg-code" name="ejgCode" type="text" maxlength="40">
+                            </label>
+                            <label>
+                                OM azonosító
+                                <input id="profile-om-identifier" name="omAzonosito" type="text" maxlength="20" inputmode="numeric">
+                            </label>
+                            <button id="profile-save-btn" class="save-btn" type="submit">Mentés</button>
+                        </fieldset>
+                        <p id="profile-status" class="profile-status" role="status" aria-live="polite"></p>
+                    </form>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <script src="/__/firebase/10.13.0/firebase-app-compat.js"></script>
+    <script src="/__/firebase/10.13.0/firebase-auth-compat.js"></script>
+    <script src="/__/firebase/10.13.0/firebase-firestore-compat.js"></script>
+    <script src="/__/firebase/init.js"></script>
+    <script src="/firebase-emulators.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>

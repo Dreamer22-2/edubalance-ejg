@@ -15,6 +15,10 @@ service cloud.firestore {
     //   - photoURL: string, required, empty or HTTP(S) URL, at most 2048 characters
     //   - role: string, required, one of visitor/user/admin/dev/owner
     //   - createdAt: timestamp, required, immutable
+    //   - username: string, optional, at most 40 characters
+    //   - schoolIdentifiers: map, optional, contains ejgCode (string, at most
+    //     40 characters) and omAzonosito (string, at most 20 characters);
+    //     both must be empty or both must be provided
     //
     // This collection contains profile information. Users can read only their
     // own profile; admin/dev/owner roles can list profiles for User Management.
@@ -47,6 +51,30 @@ service cloud.firestore {
       return data.keys().hasAll(fields);
     }
 
+    function isValidOptionalString(data, field, maxSize) {
+      return !(field in data) ||
+        (data[field] is string && data[field].size() <= maxSize);
+    }
+
+    function isValidSchoolIdentifiers(data) {
+      return !('schoolIdentifiers' in data) ||
+        (
+          data.schoolIdentifiers is map &&
+          data.schoolIdentifiers.keys().hasAll(['ejgCode', 'omAzonosito']) &&
+          data.schoolIdentifiers.keys().hasOnly(['ejgCode', 'omAzonosito']) &&
+          data.schoolIdentifiers.ejgCode is string &&
+          data.schoolIdentifiers.ejgCode.size() <= 40 &&
+          data.schoolIdentifiers.omAzonosito is string &&
+          data.schoolIdentifiers.omAzonosito.size() <= 20 &&
+          (
+            (data.schoolIdentifiers.ejgCode.size() == 0 &&
+              data.schoolIdentifiers.omAzonosito.size() == 0) ||
+            (data.schoolIdentifiers.ejgCode.size() > 0 &&
+              data.schoolIdentifiers.omAzonosito.size() > 0)
+          )
+        );
+    }
+
     function isSchoolEmail() {
       return isAuthenticated() &&
         request.auth.token.email_verified == true &&
@@ -62,7 +90,10 @@ service cloud.firestore {
 
     function isValidUser(data, userId) {
       return hasRequiredFields(data, ['uid', 'name', 'email', 'photoURL', 'role', 'createdAt']) &&
-        data.keys().hasOnly(['uid', 'name', 'email', 'photoURL', 'role', 'createdAt']) &&
+        data.keys().hasOnly([
+          'uid', 'name', 'email', 'photoURL', 'role', 'createdAt',
+          'username', 'schoolIdentifiers'
+        ]) &&
         data.uid is string &&
         data.uid == userId &&
         data.name is string &&
@@ -76,7 +107,9 @@ service cloud.firestore {
         data.photoURL.size() <= 2048 &&
         (data.photoURL == '' || data.photoURL.matches('^https?://.+$')) &&
         data.role in ['visitor', 'user', 'admin', 'dev', 'owner'] &&
-        data.createdAt is timestamp;
+        data.createdAt is timestamp &&
+        isValidOptionalString(data, 'username', 40) &&
+        isValidSchoolIdentifiers(data);
     }
 
     function canCreateRole(role) {
@@ -114,6 +147,14 @@ service cloud.firestore {
         );
     }
 
+    function isValidProfileUpdate(userId) {
+        return isOwner(userId) &&
+          isDocOwner() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'username', 'schoolIdentifiers'
+          ]);
+    }
+
     match /users/{userId} {
       allow get: if isOwner(userId) || hasAdminAccess();
       allow list: if hasAdminAccess();
@@ -128,7 +169,7 @@ service cloud.firestore {
       allow update: if isValidUser(request.resource.data, userId) &&
         uidNotModified() &&
         request.resource.data.createdAt == resource.data.createdAt &&
-        isValidRoleUpdate(userId);
+        (isValidRoleUpdate(userId) || isValidProfileUpdate(userId));
 
       // Privileged roles may remove another user's Firestore profile, except
       // owner profiles. This does not delete the Firebase Authentication account.

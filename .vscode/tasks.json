@@ -10,7 +10,7 @@
 				"firebase-tools@latest",
 				"emulators:start",
 				"--only",
-				"auth,firestore,hosting,ui"
+				"auth,firestore,functions,hosting,ui"
 			],
 			"isBackground": true,
 			"problemMatcher": []
