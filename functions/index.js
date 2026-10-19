@@ -9,7 +9,6 @@ initializeApp();
 const database = getFirestore();
 const timetableEndpoint = 'https://suli.ejg.hu/intranet/szulkuk/szulkuk.php';
 const allowedRoles = ['user', 'admin', 'dev', 'owner'];
-const schoolEmailPattern = /@e5vos\.hu$/i;
 
 exports.getMyTimetable = onCall({
     region: 'europe-central2',
@@ -22,14 +21,6 @@ exports.getMyTimetable = onCall({
     }
     if (request.data && Object.keys(request.data).length > 0) {
         throw new HttpsError('invalid-argument', 'The timetable request must not include profile data.');
-    }
-
-    const email = request.auth.token.email;
-    if (typeof email !== 'string' ||
-        email.length > 254 ||
-        request.auth.token.email_verified !== true ||
-        !schoolEmailPattern.test(email)) {
-        throw new HttpsError('permission-denied', 'A verified school account is required.');
     }
 
     const profileSnapshot = await database.collection('users').doc(request.auth.uid).get();
@@ -56,12 +47,8 @@ exports.getMyTimetable = onCall({
         throw new HttpsError('failed-precondition', 'Add both school identifiers in your profile first.');
     }
 
-    const form = new URLSearchParams({
-        EMAIL: email,
-        DIAKKOD: ejgCode,
-        OMKOD: omAzonosito
-    });
-    const requestBody = `${form.toString()}&orarend=V%E1laszt`;
+    const requestBody = `EMAIL=%28%3A&DIAKKOD=${encodeURIComponent(ejgCode)}` +
+        `&OMKOD=${encodeURIComponent(omAzonosito)}&orarend=V%E1laszt`;
 
     let upstreamResponse;
     try {
@@ -71,7 +58,8 @@ exports.getMyTimetable = onCall({
             signal: AbortSignal.timeout(12000),
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'text/html'
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Referer': 'https://suli.ejg.hu/intranet/szulkuk/menu.php'
             },
             body: requestBody
         });
@@ -131,9 +119,16 @@ exports.getMyTimetable = onCall({
 
     let html;
     try {
-        html = new TextDecoder('iso-8859-2', { fatal: true }).decode(responseBytes);
+        html = new TextDecoder('windows-1250', { fatal: true }).decode(responseBytes);
     } catch {
         throw new HttpsError('internal', 'The school timetable used an unsupported character encoding.');
+    }
+
+    if (!/<big\b/i.test(html) || !/órarendje\s*<\/big>/i.test(html)) {
+        throw new HttpsError(
+            'failed-precondition',
+            'The school did not confirm these identifiers or did not return a timetable.'
+        );
     }
 
     try {

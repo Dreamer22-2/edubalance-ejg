@@ -1,72 +1,85 @@
 const cheerio = require('cheerio');
 
 const WEEKDAYS = ['HÉTFŐ', 'KEDD', 'SZERDA', 'CSÜTÖRTÖK', 'PÉNTEK'];
+const SUBJECT_NAMES = {
+    mat: 'Matematika',
+    tes: 'Testnevelés',
+    bio: 'Biológia',
+    foc: 'Földrajz',
+    an: 'Angol nyelv',
+    nyt: 'Nyelvtan',
+    ne: 'Német nyelv',
+    or: 'Orosz nyelv',
+    fiz: 'Fizika',
+    ofn: 'Osztályfőnöki',
+    ird: 'Irodalom',
+    zen: 'Ének-zene',
+    dig: 'Digitális kultúra',
+    kem: 'Kémia',
+    tor: 'Történelem',
+    rvk: 'Rajz-vizuális kultúra',
+    api: 'Állampolgári ismeretek'
+};
 
 function cellText(cell, $) {
     return $(cell).text().replace(/\s+/g, ' ').trim();
 }
 
-function normalizeHeader(value) {
-    return value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toUpperCase();
+function subjectDetails(code) {
+    const match = /(\d+)([a-z]+)([a-z0-9]+)/i.exec(code);
+    if (!match) {
+        return { subjectCode: '', subject: code };
+    }
+
+    const subjectCode = match[2].toLowerCase().split('x')[0];
+    return {
+        subjectCode,
+        subject: SUBJECT_NAMES[subjectCode] || subjectCode
+    };
 }
 
 function parseTimetable(html) {
     const $ = cheerio.load(html);
-    const tables = $('table').toArray();
-    if (tables.length === 0) {
-        throw new Error('The response did not contain a timetable table.');
+    const rows = $('tr').toArray();
+    if (!rows.length) {
+        throw new Error('The response did not contain timetable rows.');
     }
-
-    let table;
-    let headerRow;
-    for (const candidate of tables) {
-        const matchingHeader = $(candidate).find('tr').toArray().find((row) => {
-            const cells = $(row).children('th, td').toArray();
-            const names = cells.slice(1).map((cell) => normalizeHeader(cellText(cell, $)));
-            return names.length === WEEKDAYS.length &&
-                names.every((day, index) => day === normalizeHeader(WEEKDAYS[index]));
-        });
-        if (matchingHeader) {
-            table = $(candidate);
-            headerRow = matchingHeader;
-            break;
-        }
-    }
-    if (!table) {
-        throw new Error('The timetable weekday header was not found.');
-    }
-
-    const rows = table.find('tr').toArray();
 
     const days = WEEKDAYS.map((name) => ({ name, lessons: [] }));
     let periodRowsFound = 0;
-    rows.forEach((row, rowIndex) => {
-        const cells = $(row).children('td').toArray();
-        const periodMatch = cellText(cells[0], $).match(/^(\d{1,2})\.$/);
-        if (!periodMatch || cells.length < WEEKDAYS.length + 1) return;
+    for (let period = 0; period <= 7; period += 1) {
+        const rowIndex = rows.findIndex((row) => {
+            const firstCell = $(row).children('td').first();
+            return firstCell.length > 0 &&
+                new RegExp(`^${period}\\.`).test(cellText(firstCell, $));
+        });
+        if (rowIndex < 0) continue;
 
-        const period = Number(periodMatch[1]);
-        if (period > 20) return;
+        const subjectCells = $(rows[rowIndex]).children('td').toArray();
+        if (subjectCells.length < WEEKDAYS.length + 1) continue;
         periodRowsFound += 1;
-
         const teacherCells = rows[rowIndex + 1]
             ? $(rows[rowIndex + 1]).children('td').toArray()
             : [];
-        WEEKDAYS.forEach((name, dayIndex) => {
-            const subject = cellText(cells[dayIndex + 1], $);
-            if (!subject || subject === '-') return;
 
-            const teacher = cellText(teacherCells[dayIndex], $);
-            if (subject.length > 120 || teacher.length > 120) {
+        WEEKDAYS.forEach((name, dayIndex) => {
+            const code = cellText(subjectCells[dayIndex + 1], $) || '-';
+            if (code === '-') return;
+
+            const teacher = cellText(teacherCells[dayIndex], $) || '-';
+            if (code.length > 120 || teacher.length > 120) {
                 throw new Error('A timetable entry exceeded the supported length.');
             }
+            const details = subjectDetails(code);
             days[dayIndex].lessons.push({
                 period,
-                subject,
+                code,
+                subjectCode: details.subjectCode,
+                subject: details.subject,
                 teacher: teacher === '-' ? '' : teacher
             });
         });
-    });
+    }
 
     if (periodRowsFound === 0) {
         throw new Error('The timetable contained no lesson periods.');

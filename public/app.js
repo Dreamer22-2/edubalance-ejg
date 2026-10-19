@@ -263,7 +263,6 @@ async function loadProfileSettings(user) {
     if (!profileForm) return;
 
     const profileFields = profileForm.querySelector('#profile-fields');
-    const profileStatus = profileForm.querySelector('#profile-status');
     try {
         const profileSnapshot = await db.collection('users').doc(user.uid).get();
         if (!profileSnapshot.exists) {
@@ -301,10 +300,8 @@ async function loadProfileSettings(user) {
             appMain.querySelector(selector).value = value || '';
         });
         profileFields.disabled = false;
-        profileStatus.textContent = '';
     } catch (error) {
         console.error('Failed to load profile settings:', error);
-        profileStatus.textContent = 'Nem sikerült betölteni a profiladatokat.';
         showToast('Nem sikerült betölteni a profiladatokat.', 'error');
     }
 }
@@ -322,19 +319,17 @@ function initializeProfileForm() {
         }
 
         const profileFields = profileForm.querySelector('#profile-fields');
-        const profileStatus = profileForm.querySelector('#profile-status');
         const saveButton = profileForm.querySelector('#profile-save-btn');
         const ejgCode = profileForm.querySelector('#profile-ejg-code').value.trim();
         const omAzonosito = profileForm.querySelector('#profile-om-identifier').value.trim();
         if (Boolean(ejgCode) !== Boolean(omAzonosito)) {
-            profileStatus.textContent = 'Az EJG-kódot és az OM azonosítót együtt kell megadnod.';
             showToast('Az EJG-kódot és az OM azonosítót együtt kell megadnod.', 'error');
             return;
         }
 
         saveButton.disabled = true;
+        saveButton.setAttribute('aria-busy', 'true');
         profileFields.disabled = true;
-        profileStatus.textContent = 'Mentés folyamatban...';
 
         try {
             await db.collection('users').doc(user.uid).update({
@@ -348,37 +343,87 @@ function initializeProfileForm() {
             };
             signedInProfile = updatedProfile;
             renderHeader(user);
-            profileStatus.textContent = 'A profiladatok mentése sikerült.';
             showToast('A profiladatok mentése sikerült.', 'success');
         } catch (error) {
             console.error('Failed to save profile settings:', error);
-            profileStatus.textContent = 'Nem sikerült menteni a profiladatokat.';
             showToast('Nem sikerült menteni a profiladatokat.', 'error');
         } finally {
             saveButton.disabled = false;
+            saveButton.removeAttribute('aria-busy');
             profileFields.disabled = false;
         }
     });
 }
 
 function initializeTimetable() {
-    const button = appMain.querySelector('#load-timetable-btn');
     const help = appMain.querySelector('#timetable-help');
-    const status = appMain.querySelector('#timetable-status');
+    const loading = appMain.querySelector('#timetable-loading');
     const results = appMain.querySelector('#timetable-results');
-    if (!button || !help || !status || !results) return;
+    if (!help || !loading || !results) return;
+    let selectedDayIndex = 0;
+    let activeUid = null;
+    let requestedUid = null;
+    let requestSequence = 0;
 
-    function updateAvailability(profile) {
+    function loadForProfile(profile) {
+        const user = auth.currentUser;
+        const uid = user?.uid || null;
+        if (uid !== activeUid) {
+            activeUid = uid;
+            requestedUid = null;
+            requestSequence += 1;
+            loading.hidden = true;
+            results.replaceChildren();
+            results.hidden = true;
+        }
+
         const identifiers = profile?.schoolIdentifiers;
         const hasIdentifiers = typeof identifiers?.ejgCode === 'string' &&
             identifiers.ejgCode.trim().length > 0 &&
             typeof identifiers?.omAzonosito === 'string' &&
             identifiers.omAzonosito.trim().length > 0;
 
-        button.disabled = !hasIdentifiers;
-        help.textContent = hasIdentifiers
-            ? 'Az órarend csak a saját fiókodhoz mentett azonosítókkal kérhető le.'
-            : 'Az órarend betöltéséhez töltsd ki az EJG-kódot és az OM azonosítót a profilodban.';
+        help.hidden = !user || hasIdentifiers;
+
+        if (!user ||
+            !hasIdentifiers ||
+            !(profile.role === 'user' || privilegedRoles.includes(profile.role)) ||
+            requestedUid === uid) {
+            return;
+        }
+
+        requestedUid = uid;
+        const currentRequest = ++requestSequence;
+        loading.hidden = false;
+        results.hidden = true;
+        results.replaceChildren();
+
+        const errorMessages = {
+            'functions/failed-precondition': 'Az iskola nem találta az órarendet ezekkel az azonosítókkal. Ellenőrizd a profiladatokat.',
+            'functions/unavailable': 'Az iskola órarend-szolgáltatása most nem érhető el. Próbáld újra később.',
+            'functions/unauthenticated': 'Az órarend betöltéséhez jelentkezz be újra.',
+            'functions/permission-denied': 'Ehhez a fiókhoz nincs jogosultság az órarend lekérésére.',
+            'functions/resource-exhausted': 'Az iskola túl nagy választ küldött. Próbáld újra később.',
+            'functions/internal': 'Az órarend feldolgozása nem sikerült. Ellenőrizd a Functions emulator naplóját.'
+        };
+
+        (async () => {
+            try {
+                const callable = firebase.app().functions('europe-central2').httpsCallable('getMyTimetable');
+                const response = await callable({});
+                if (requestSequence !== currentRequest || auth.currentUser?.uid !== uid) return;
+                render(response.data?.days);
+            } catch (error) {
+                if (requestSequence !== currentRequest || auth.currentUser?.uid !== uid) return;
+                console.error('Failed to load the signed-in user timetable:', error);
+                showToast(
+                    errorMessages[error?.code] || 'Nem sikerült betölteni az órarendet. Próbáld újra később.',
+                    'error'
+                );
+            } finally {
+                if (requestSequence === currentRequest) loading.hidden = true;
+            }
+        })();
     }
 
     function render(days) {
@@ -395,20 +440,32 @@ function initializeTimetable() {
             throw new Error('A kapott órarend formátuma nem megfelelő.');
         }
 
-        const fragment = document.createDocumentFragment();
-        days.forEach((day) => {
-            const daySection = document.createElement('section');
-            daySection.className = 'timetable-day';
+        const dayLabels = ['Hé', 'Ke', 'Sz', 'Cs', 'Pé'];
+        selectedDayIndex = Math.min(selectedDayIndex, days.length - 1);
 
+        const tabs = document.createElement('div');
+        tabs.className = 'timetable-day-tabs';
+        tabs.setAttribute('role', 'tablist');
+        tabs.setAttribute('aria-label', 'A hét napjai');
+
+        const panel = document.createElement('section');
+        panel.className = 'timetable-day-panel';
+        panel.id = 'timetable-day-panel';
+        panel.setAttribute('role', 'tabpanel');
+
+        const renderSelectedDay = (index) => {
+            selectedDayIndex = index;
+            const day = days[index];
             const heading = document.createElement('h3');
+            heading.className = 'timetable-day-heading';
             heading.textContent = day.name;
-            daySection.append(heading);
 
+            const panelContent = [heading];
             if (day.lessons.length === 0) {
                 const emptyMessage = document.createElement('p');
                 emptyMessage.className = 'timetable-empty';
                 emptyMessage.textContent = 'Nincs óra.';
-                daySection.append(emptyMessage);
+                panelContent.push(emptyMessage);
             } else {
                 const lessonList = document.createElement('ol');
                 lessonList.className = 'timetable-lessons';
@@ -416,55 +473,67 @@ function initializeTimetable() {
                     const item = document.createElement('li');
                     const period = document.createElement('span');
                     period.className = 'timetable-period';
-                    period.textContent = `${lesson.period}. óra`;
-                    item.append(period);
+                    period.textContent = `${lesson.period}.`;
 
+                    const details = document.createElement('span');
+                    details.className = 'timetable-lesson-details';
                     const subject = document.createElement('strong');
                     subject.textContent = lesson.subject;
-                    item.append(subject);
+                    details.append(subject);
 
                     if (lesson.teacher) {
                         const teacher = document.createElement('span');
                         teacher.className = 'timetable-teacher';
-                        teacher.textContent = lesson.teacher;
-                        item.append(teacher);
+                        teacher.textContent = ` (${lesson.teacher})`;
+                        details.append(teacher);
                     }
+                    item.append(period, details);
                     lessonList.append(item);
                 });
-                daySection.append(lessonList);
+                panelContent.push(lessonList);
             }
-            fragment.append(daySection);
+            panel.replaceChildren(...panelContent);
+            panel.setAttribute('aria-labelledby', `timetable-day-tab-${index}`);
+
+            tabs.querySelectorAll('[role="tab"]').forEach((tab, tabIndex) => {
+                const isSelected = tabIndex === index;
+                tab.setAttribute('aria-selected', String(isSelected));
+                tab.tabIndex = isSelected ? 0 : -1;
+            });
+        };
+
+        dayLabels.forEach((label, index) => {
+            const tab = document.createElement('button');
+            tab.id = `timetable-day-tab-${index}`;
+            tab.className = 'timetable-day-tab';
+            tab.type = 'button';
+            tab.setAttribute('role', 'tab');
+            tab.setAttribute('aria-controls', panel.id);
+            tab.textContent = label;
+            tab.addEventListener('click', () => renderSelectedDay(index));
+            tab.addEventListener('keydown', (event) => {
+                let nextIndex;
+                if (event.key === 'ArrowRight') nextIndex = (index + 1) % days.length;
+                if (event.key === 'ArrowLeft') nextIndex = (index + days.length - 1) % days.length;
+                if (event.key === 'Home') nextIndex = 0;
+                if (event.key === 'End') nextIndex = days.length - 1;
+                if (nextIndex === undefined) return;
+
+                event.preventDefault();
+                const nextTab = tabs.querySelectorAll('[role="tab"]')[nextIndex];
+                nextTab.focus();
+                renderSelectedDay(nextIndex);
+            });
+            tabs.append(tab);
         });
 
-        results.replaceChildren(fragment);
+        results.replaceChildren(tabs, panel);
+        renderSelectedDay(selectedDayIndex);
         results.hidden = false;
     }
 
-    button.addEventListener('click', async () => {
-        if (!auth.currentUser || button.disabled) return;
-
-        button.disabled = true;
-        status.textContent = 'Órarend betöltése...';
-        results.hidden = true;
-        results.replaceChildren();
-
-        try {
-            const callable = firebase.app().functions('europe-central2').httpsCallable('getMyTimetable');
-            const response = await callable({});
-            render(response.data?.days);
-            status.textContent = 'Az órarend betöltése sikerült.';
-        } catch (error) {
-            console.error('Failed to load the signed-in user timetable:', error);
-            status.textContent = typeof error?.message === 'string'
-                ? error.message
-                : 'Nem sikerült betölteni az órarendet. Próbáld újra később.';
-        } finally {
-            updateAvailability(signedInProfile);
-        }
-    });
-
-    updateAvailability(signedInProfile);
-    return updateAvailability;
+    loadForProfile(null);
+    return loadForProfile;
 }
 
 function enforceRouteAccess(role) {
@@ -536,6 +605,7 @@ auth.onAuthStateChanged(async (user) => {
         if (role === 'user' || privilegedRoles.includes(role)) {
             await loadProfileSettings(user);
         }
+        updateTimetableAvailability?.(signedInProfile);
     } catch (error) {
         console.error('Failed to load or create the user profile:', error);
         showToast('Nem sikerült betölteni a felhasználói jogosultságokat.', 'error');

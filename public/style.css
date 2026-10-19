@@ -464,46 +464,94 @@ button[hidden] {
     text-align: left;
 }
 
-.app-card {
+#app-content {
     max-width: 720px;
-    padding: 24px;
-    border: 1px solid rgba(46, 213, 145, 0.1);
-    border-radius: 12px;
-    background: rgba(23, 28, 26, 0.65);
 }
 
-.app-card h2 {
+#app-content h2 {
     margin-top: 0;
     color: #2ed591;
 }
 
 .timetable-results {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 560px;
+    box-sizing: border-box;
     margin-top: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(46, 213, 145, 0.16);
+    border-radius: 12px;
+    background: rgba(15, 20, 17, 0.55);
 }
 
 .timetable-results[hidden] {
     display: none;
 }
 
-.timetable-day {
-    min-width: 0;
-    padding: 14px;
-    border: 1px solid rgba(113, 128, 150, 0.24);
-    border-radius: 8px;
-    background: rgba(15, 20, 17, 0.55);
+.timetable-loading {
+    display: flex;
+    justify-content: center;
+    padding: 16px;
 }
 
-.timetable-day h3 {
+.timetable-loading[hidden] {
+    display: none;
+}
+
+.timetable-day-tabs {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border-bottom: 1px solid rgba(113, 128, 150, 0.2);
+}
+
+.timetable-day-tab {
+    min-width: 0;
+    padding: 8px 6px;
+    border: 1px solid rgba(113, 128, 150, 0.32);
+    border-radius: 8px;
+    background: rgba(23, 28, 26, 0.8);
+    color: #cbd5e0;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.timetable-day-tab:hover {
+    border-color: rgba(46, 213, 145, 0.65);
+    color: #fff;
+}
+
+.timetable-day-tab[aria-selected="true"] {
+    border-color: #2ed591;
+    background: #2ed591;
+    color: #0f1411;
+}
+
+.timetable-day-tab:focus-visible {
+    outline: 2px solid #2ed591;
+    outline-offset: 2px;
+}
+
+.timetable-day-panel {
+    min-width: 0;
+    padding: 14px 16px;
+}
+
+.timetable-day-heading {
     margin: 0 0 10px;
     color: #2ed591;
+    font-size: 1rem;
 }
 
 .timetable-lessons {
     display: grid;
-    gap: 10px;
+    gap: 0;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -511,18 +559,37 @@ button[hidden] {
 
 .timetable-lessons li {
     display: grid;
-    gap: 3px;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: baseline;
+    gap: 6px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(113, 128, 150, 0.14);
 }
 
-.timetable-period,
+.timetable-lessons li:last-child {
+    border-bottom: 0;
+}
+
+.timetable-period {
+    color: #8bd6b4;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.timetable-lesson-details {
+    min-width: 0;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
 .timetable-teacher,
 .timetable-empty {
     color: #a0aec0;
     font-size: 0.9rem;
 }
 
-.timetable-status {
-    min-height: 1.5em;
+.timetable-empty {
+    margin: 0;
 }
 
 .profile-settings {
@@ -575,6 +642,15 @@ button[hidden] {
     text-align: right;
 }
 
+.profile-fields .profile-om-identifier-label {
+    grid-template-columns: minmax(130px, 190px) minmax(0, 1fr);
+}
+
+.profile-fields .profile-field-label {
+    line-height: 1.35;
+    white-space: nowrap;
+}
+
 .profile-fields input {
     width: 100%;
     max-width: 280px;
@@ -597,6 +673,14 @@ button[hidden] {
 
     .profile-fields label {
         font-size: 0.85rem;
+    }
+
+    .profile-fields .profile-om-identifier-label {
+        grid-template-columns: minmax(130px, 42%) minmax(0, 1fr);
+    }
+
+    .profile-fields .profile-field-label {
+        min-width: 130px;
     }
 
     .profile-fields input {
@@ -623,12 +707,6 @@ button[hidden] {
     justify-self: start;
     padding: 10px 18px;
     border-radius: 8px;
-}
-
-.profile-status {
-    min-height: 1.5em;
-    margin: 12px 0 0;
-    font-size: 0.9rem;
 }
 
 .admin-header h1 {

@@ -11,8 +11,6 @@ auth.onAuthStateChanged((user) => {
     db.collection('users').doc(user.uid).get()
     .then((doc) => {
         if (doc.exists && privilegedRoles.includes(doc.data().role)) {
-            const role = doc.data().role;
-            document.getElementById('admin-welcome-text').innerText = `Bejelentkezve mint: ${user.displayName} (${role})`;
             document.getElementById('admin-content').style.display = 'block';
         } else {
             alert("Nincs admin jogosultságod!");

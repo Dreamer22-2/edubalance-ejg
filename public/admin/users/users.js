@@ -21,7 +21,6 @@ let lastDocumentId = null;
 let hasMoreUsers = true;
 let isLoadingUsers = false;
 let automaticLoadingPaused = false;
-let lastLoadFailed = false;
 let loadObserver;
 
 auth.onAuthStateChanged((user) => {
@@ -180,17 +179,13 @@ function updateListControls() {
     loadMoreButton.hidden = isLoadingUsers || !hasMoreUsers;
 
     if (!isLoadingUsers) {
-        if (lastLoadFailed) {
-            listStatus.textContent = 'Nem sikerült betölteni a felhasználókat. Próbáld újra.';
-        } else {
-            const term = searchInput.value.trim().toLowerCase();
-            const matchingCount = getFilteredUsers(term).length;
-            listStatus.textContent = term
-                ? `${matchingCount} találat a ${allUsersData.length} betöltött felhasználó között.`
-                : hasMoreUsers
-                    ? `${allUsersData.length} felhasználó betöltve.`
-                    : `${allUsersData.length} felhasználó összesen.`;
-        }
+        const term = searchInput.value.trim().toLowerCase();
+        const matchingCount = getFilteredUsers(term).length;
+        listStatus.textContent = term
+            ? `${matchingCount} találat a ${allUsersData.length} betöltött felhasználó között.`
+            : hasMoreUsers
+                ? `${allUsersData.length} felhasználó betöltve.`
+                : `${allUsersData.length} felhasználó összesen.`;
     }
 }
 
@@ -220,7 +215,6 @@ async function loadNextUserBatch(refresh = false) {
 
     isLoadingUsers = true;
     automaticLoadingPaused = false;
-    lastLoadFailed = false;
     updateListControls();
 
     try {
@@ -256,7 +250,6 @@ async function loadNextUserBatch(refresh = false) {
     } catch (error) {
         console.error('Error fetching users:', error);
         automaticLoadingPaused = true;
-        lastLoadFailed = true;
         showToast('Hiba történt a felhasználók betöltése közben.', 'error');
     } finally {
         isLoadingUsers = false;
