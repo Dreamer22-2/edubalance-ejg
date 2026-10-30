@@ -3,7 +3,11 @@
 This Cloudflare Worker proxies the school's timetable endpoint without requiring
 Firebase Functions in production. It validates the Firebase ID token, reads
 only that token's own Firestore profile using the profile's owner-only Firestore
-permission, and returns the parsed timetable without storing it.
+permission, and returns the parsed timetable without storing it. `admin`, `dev`,
+and `owner` profiles can submit manual identifiers through the inspector; the
+Worker rechecks that role before sending those identifiers to the school. The
+regular signed-in timetable flow continues to use only the caller's saved
+profile identifiers.
 
 ## Deploy
 

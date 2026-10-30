@@ -89,6 +89,7 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
     const calls = [];
     let firestoreStatus = 200;
     let schoolStatus = 200;
+    let profileRole = 'user';
 
     globalThis.fetch = async (input, init = {}) => {
         const url = String(input);
@@ -100,7 +101,7 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
             if (firestoreStatus !== 200) return new Response(null, { status: firestoreStatus });
             return Response.json({
                 fields: {
-                    role: { stringValue: 'user' },
+                    role: { stringValue: profileRole },
                     schoolIdentifiers: {
                         mapValue: {
                             fields: {
@@ -157,6 +158,54 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
         assert.equal(schoolCall.init.redirect, 'manual');
         assert.match(schoolCall.init.body, /DIAKKOD=TEST-EJG/);
         assert.match(schoolCall.init.body, /OMKOD=12345/);
+        assert.match(schoolCall.init.body, /EMAIL=%28%3A/);
+
+        profileRole = 'admin';
+        const inspectorResponse = await worker.fetch(new Request('https://worker.example/', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://edubalance-ejg.web.app',
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ejgCode: 'MANUAL-EJG', omAzonosito: '54321' })
+        }), env);
+        assert.equal(inspectorResponse.status, 200);
+        const inspectorSchoolCall = calls.filter(({ url }) => url.includes('suli.ejg.hu')).at(-1);
+        assert.match(inspectorSchoolCall.init.body, /EMAIL=X/);
+        assert.match(inspectorSchoolCall.init.body, /DIAKKOD=MANUAL-EJG/);
+        assert.match(inspectorSchoolCall.init.body, /OMKOD=54321/);
+
+        const invalidInspectorResponse = await worker.fetch(new Request('https://worker.example/', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://edubalance-ejg.web.app',
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ejgCode: 'MANUAL-EJG', omAzonosito: '5432' })
+        }), env);
+        assert.equal(invalidInspectorResponse.status, 400);
+        assert.deepEqual(await invalidInspectorResponse.json(), {
+            error: { code: 'invalid-argument' }
+        });
+
+        profileRole = 'user';
+        const deniedInspectorResponse = await worker.fetch(new Request('https://worker.example/', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://edubalance-ejg.web.app',
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ejgCode: 'MANUAL-EJG', omAzonosito: '54321' })
+        }), env);
+        assert.equal(deniedInspectorResponse.status, 403);
+        assert.deepEqual(await deniedInspectorResponse.json(), {
+            error: { code: 'permission-denied' }
+        });
+
+        profileRole = 'user';
 
         const wrongProjectToken = await new SignJWT({ user_id: uid })
             .setProtectedHeader({ alg: 'RS256', kid: publicJwk.kid })

@@ -153,8 +153,11 @@ async function getOwnProfile(uid, token, projectId) {
     return response.json();
 }
 
-async function fetchTimetable(ejgCode, omAzonosito) {
-    const requestBody = `EMAIL=%28%3A&DIAKKOD=${encodeURIComponent(ejgCode)}` +
+async function fetchTimetable(ejgCode, omAzonosito, email = '(:') {
+    const encodedEmail = encodeURIComponent(email).replace(/[!'()*]/g, (character) =>
+        `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+    );
+    const requestBody = `EMAIL=${encodedEmail}&DIAKKOD=${encodeURIComponent(ejgCode)}` +
         `&OMKOD=${encodeURIComponent(omAzonosito)}&orarend=V%E1laszt`;
     let response;
     try {
@@ -264,8 +267,17 @@ export default {
             } catch {
                 return jsonResponse({ error: { code: 'invalid-argument' } }, 400, headers);
             }
-            if (!body || typeof body !== 'object' || Array.isArray(body) ||
-                Object.keys(body).length !== 0) {
+            if (!body || typeof body !== 'object' || Array.isArray(body)) {
+                return jsonResponse({ error: { code: 'invalid-argument' } }, 400, headers);
+            }
+            const bodyKeys = Object.keys(body);
+            const isInspectorRequest = bodyKeys.length > 0;
+            if (isInspectorRequest &&
+                (bodyKeys.length !== 2 ||
+                    !bodyKeys.includes('ejgCode') ||
+                    !bodyKeys.includes('omAzonosito') ||
+                    typeof body.ejgCode !== 'string' ||
+                    typeof body.omAzonosito !== 'string')) {
                 return jsonResponse({ error: { code: 'invalid-argument' } }, 400, headers);
             }
 
@@ -297,15 +309,30 @@ export default {
             if (!['user', 'admin', 'dev', 'owner'].includes(role)) {
                 return jsonResponse({ error: { code: 'permission-denied' } }, 403, headers);
             }
-            const schoolIdentifiers = profile.fields?.schoolIdentifiers?.mapValue?.fields;
-            const ejgCode = schoolIdentifiers?.ejgCode?.stringValue?.trim();
-            const omAzonosito = schoolIdentifiers?.omAzonosito?.stringValue?.trim();
-            if (!ejgCode || !omAzonosito || ejgCode.length > 40 || omAzonosito.length > 20) {
-                return jsonResponse({ error: { code: 'failed-precondition' } }, 412, headers);
+            let ejgCode;
+            let omAzonosito;
+            let email = '(:';
+            if (isInspectorRequest) {
+                if (!['admin', 'dev', 'owner'].includes(role)) {
+                    return jsonResponse({ error: { code: 'permission-denied' } }, 403, headers);
+                }
+                ejgCode = body.ejgCode.trim();
+                omAzonosito = body.omAzonosito.trim();
+                if (!ejgCode || ejgCode.length > 40 || !/^\d{5}$/.test(omAzonosito)) {
+                    return jsonResponse({ error: { code: 'invalid-argument' } }, 400, headers);
+                }
+                email = 'X';
+            } else {
+                const schoolIdentifiers = profile.fields?.schoolIdentifiers?.mapValue?.fields;
+                ejgCode = schoolIdentifiers?.ejgCode?.stringValue?.trim();
+                omAzonosito = schoolIdentifiers?.omAzonosito?.stringValue?.trim();
+                if (!ejgCode || !omAzonosito || ejgCode.length > 40 || omAzonosito.length > 20) {
+                    return jsonResponse({ error: { code: 'failed-precondition' } }, 412, headers);
+                }
             }
 
             try {
-                return jsonResponse(await fetchTimetable(ejgCode, omAzonosito), 200, headers);
+                return jsonResponse(await fetchTimetable(ejgCode, omAzonosito, email), 200, headers);
             } catch (error) {
                 if (error.code && error.status) throw error;
                 console.error('Timetable Worker school request failed:', error.name || 'Error');

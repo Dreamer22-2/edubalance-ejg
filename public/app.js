@@ -11,6 +11,7 @@ let signedInProfile = null;
 
 function getActiveRoute() {
     const path = window.location.pathname;
+    if (path.startsWith('/admin/timetable')) return '/admin/timetable/';
     if (path.startsWith('/admin/users')) return '/admin/users/';
     if (path.startsWith('/admin')) return '/admin/';
     if (path === '/profile' || path.startsWith('/profile/')) return '/profile';
@@ -26,7 +27,8 @@ function renderSidebar(role) {
     ];
     const adminLinks = [
         { label: 'Admin Konzol', href: '/admin/' },
-        { label: 'Felhasználók', href: '/admin/users/', subpage: true }
+        { label: 'Felhasználók', href: '/admin/users/', subpage: true },
+        { label: 'Órarend-ellenőrző', href: '/admin/timetable/', subpage: true }
     ];
     const renderLink = (link) => {
         const icon = link.href === '/'

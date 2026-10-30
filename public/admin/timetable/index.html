@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Órarend-ellenőrző - EduBalance</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="stylesheet" href="/style.css">
+    <script src="/toast.js"></script>
+</head>
+<body>
+    <div id="toast-container"></div>
+
+    <div class="admin-layout app-layout">
+        <main class="admin-main">
+            <header class="admin-header">
+                <h1>Órarend-ellenőrző</h1>
+            </header>
+
+            <section id="timetable-inspector-content" class="timetable-inspector-content" hidden>
+                <p class="timetable-inspector-help">
+                    Add meg az EJG-kódot és az OM-azonosító utolsó 5 számjegyét. Az iskola portáljának
+                    e-mail mezőjébe az X kerül.
+                </p>
+                <form id="timetable-inspector-form" class="timetable-inspector-form">
+                    <label>
+                        EJG-kód
+                        <input id="inspector-ejg-code" name="ejgCode" type="text"
+                            maxlength="40" autocomplete="off" required>
+                    </label>
+                    <label>
+                        OM azonosító utolsó 5 számjegye
+                        <input id="inspector-om-code" name="omAzonosito" type="text"
+                            maxlength="5" pattern="[0-9]{5}" inputmode="numeric"
+                            autocomplete="off" required>
+                    </label>
+                    <button id="inspector-submit" class="save-btn" type="submit">
+                        Órarend lekérése
+                    </button>
+                </form>
+                <div id="inspector-loading" class="timetable-loading" role="status"
+                    aria-label="Órarend lekérése folyamatban" hidden>
+                    <span class="users-loading-spinner" aria-hidden="true"></span>
+                </div>
+                <div id="inspector-results" class="timetable-results" hidden></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/__/firebase/10.13.0/firebase-app-compat.js"></script>
+    <script src="/__/firebase/10.13.0/firebase-auth-compat.js"></script>
+    <script src="/__/firebase/10.13.0/firebase-firestore-compat.js"></script>
+    <script src="/__/firebase/init.js"></script>
+    <script src="/firebase-emulators.js"></script>
+    <script src="/timetable-config.js"></script>
+    <script src="/app.js?v=6"></script>
+    <script src="/admin/timetable/timetable.js"></script>
+</body>
+</html>
