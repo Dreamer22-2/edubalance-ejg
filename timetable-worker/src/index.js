@@ -170,7 +170,14 @@ async function fetchTimetable(ejgCode, omAzonosito) {
             body: requestBody
         });
     } catch (error) {
-        console.error('School timetable fetch failed:', error.name || 'Error');
+        const cause = error.cause;
+        console.error('School timetable fetch failed:', {
+            errorName: error.name || 'Error',
+            errorMessage: typeof error.message === 'string' ? error.message.slice(0, 160) : '',
+            causeName: typeof cause?.name === 'string' ? cause.name.slice(0, 80) : '',
+            causeCode: typeof cause?.code === 'string' ? cause.code.slice(0, 80) : '',
+            causeMessage: typeof cause?.message === 'string' ? cause.message.slice(0, 160) : ''
+        });
         throw Object.assign(new Error('School timetable service is unavailable.'), {
             code: 'school-connection-failed',
             status: 503
