@@ -2,7 +2,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { HttpsError, onCall } = require('firebase-functions/v2/https');
 const { logger } = require('firebase-functions');
-const { parseTimetable } = require('./timetable-parser');
+const { parseStudentName, parseTimetable } = require('./timetable-parser');
 
 initializeApp();
 
@@ -11,12 +11,12 @@ const timetableEndpoint = 'https://suli.ejg.hu/intranet/szulkuk/szulkuk.php';
 const allowedRoles = ['user', 'admin', 'dev', 'owner'];
 const privilegedRoles = ['admin', 'dev', 'owner'];
 
-async function fetchAndParseTimetable(ejgCode, omAzonosito, email = '(:') {
+async function fetchSchoolResponse(ejgCode, omAzonosito, action = 'orarend', email = '(:') {
     const encodedEmail = encodeURIComponent(email).replace(/[!'()*]/g, (character) =>
         `%${character.charCodeAt(0).toString(16).toUpperCase()}`
     );
     const requestBody = `EMAIL=${encodedEmail}&DIAKKOD=${encodeURIComponent(ejgCode)}` +
-        `&OMKOD=${encodeURIComponent(omAzonosito)}&orarend=V%E1laszt`;
+        `&OMKOD=${encodeURIComponent(omAzonosito)}&${action}=V%E1laszt`;
 
     let upstreamResponse;
     try {
@@ -32,23 +32,24 @@ async function fetchAndParseTimetable(ejgCode, omAzonosito, email = '(:') {
             body: requestBody
         });
     } catch (error) {
-        logger.warn('The school timetable endpoint could not be reached.', {
+        logger.warn('The school portal endpoint could not be reached.', {
             errorName: error.name
         });
         throw new HttpsError('unavailable', 'The school timetable service is temporarily unavailable.');
     }
 
     if (!upstreamResponse.ok) {
-        logger.warn('The school timetable endpoint returned an unsuccessful status.', {
+        logger.warn('The school portal endpoint returned an unsuccessful status.', {
             status: upstreamResponse.status
         });
         throw new HttpsError('unavailable', 'The school timetable service could not complete the request.');
     }
 
+    const responseLimit = action === 'adatok' ? 16384 : 512000;
     const contentType = upstreamResponse.headers.get('content-type') || '';
     const contentLength = Number(upstreamResponse.headers.get('content-length') || 0);
-    if (!contentType.toLowerCase().includes('text/html') || contentLength > 512000) {
-        throw new HttpsError('internal', 'The school returned an unexpected timetable response.');
+    if (!contentType.toLowerCase().includes('text/html') || contentLength > responseLimit) {
+        throw new HttpsError('internal', 'The school returned an unexpected response.');
     }
 
     let responseBytes;
@@ -61,7 +62,7 @@ async function fetchAndParseTimetable(ejgCode, omAzonosito, email = '(:') {
             const { done, value } = await reader.read();
             if (done) break;
             totalBytes += value.byteLength;
-            if (totalBytes > 512000) {
+            if (totalBytes > responseLimit) {
                 await reader.cancel();
                 throw new Error('The response exceeded the size limit.');
             }
@@ -74,22 +75,32 @@ async function fetchAndParseTimetable(ejgCode, omAzonosito, email = '(:') {
             offset += chunk.byteLength;
         });
     } catch (error) {
-        logger.warn('The school timetable response could not be read.', {
+        logger.warn('The school response could not be read.', {
             errorName: error.name
         });
         if (error.message === 'The response exceeded the size limit.') {
-            throw new HttpsError('resource-exhausted', 'The school returned an unexpectedly large timetable response.');
+            throw new HttpsError('resource-exhausted', 'The school returned an unexpectedly large response.');
         }
-        throw new HttpsError('unavailable', 'The school timetable response could not be read.');
+        throw new HttpsError('unavailable', 'The school response could not be read.');
     }
 
     let html;
+    const charset = contentType.match(/charset\s*=\s*"?([^;"\s]+)/i)?.[1]?.toLowerCase() ||
+        'windows-1250';
+    if (!['windows-1250', 'cp1250', 'iso-8859-2', 'utf-8'].includes(charset)) {
+        throw new HttpsError('internal', 'The school used an unsupported response encoding.');
+    }
     try {
-        html = new TextDecoder('windows-1250', { fatal: true }).decode(responseBytes);
+        html = new TextDecoder(charset, { fatal: true }).decode(responseBytes);
     } catch {
-        throw new HttpsError('internal', 'The school timetable used an unsupported character encoding.');
+        throw new HttpsError('internal', 'The school response used an unsupported character encoding.');
     }
 
+    return html;
+}
+
+async function fetchAndParseTimetable(ejgCode, omAzonosito, email = '(:') {
+    const html = await fetchSchoolResponse(ejgCode, omAzonosito, 'orarend', email);
     if (!/<big\b/i.test(html) || !/órarendje\s*<\/big>/i.test(html)) {
         throw new HttpsError(
             'failed-precondition',
@@ -104,6 +115,15 @@ async function fetchAndParseTimetable(ejgCode, omAzonosito, email = '(:') {
             errorName: error.name
         });
         throw new HttpsError('failed-precondition', 'The school did not return a recognizable timetable.');
+    }
+}
+
+async function fetchStudentName(ejgCode, omAzonosito) {
+    const html = await fetchSchoolResponse(ejgCode, omAzonosito, 'adatok', 'X');
+    try {
+        return parseStudentName(html);
+    } catch {
+        throw new HttpsError('failed-precondition', 'The school did not return a usable full name.');
     }
 }
 
@@ -179,7 +199,10 @@ exports.verifyMyTimetableIdentifiers = onCall({
     }
 
     await fetchAndParseTimetable(ejgCode, omAzonosito);
-    return { verified: true };
+    return {
+        verified: true,
+        name: await fetchStudentName(ejgCode, omAzonosito)
+    };
 });
 
 exports.getTimetableForInspector = onCall({
@@ -213,5 +236,9 @@ exports.getTimetableForInspector = onCall({
         throw new HttpsError('invalid-argument', 'Provide a valid EJG code and a five-digit OM identifier.');
     }
 
-    return fetchAndParseTimetable(ejgCode, omAzonosito, 'X');
+    const timetable = await fetchAndParseTimetable(ejgCode, omAzonosito, 'X');
+    return {
+        ...timetable,
+        name: await fetchStudentName(ejgCode, omAzonosito)
+    };
 });

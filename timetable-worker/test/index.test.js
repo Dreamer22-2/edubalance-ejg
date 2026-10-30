@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
-import worker, { parseTimetable } from '../src/index.js';
+import worker, { parseStudentName, parseTimetable } from '../src/index.js';
 
 const env = {
     FIREBASE_PROJECT_ID: 'edubalance-ejg',
@@ -78,6 +78,14 @@ test('parses paired subject and teacher rows into weekdays', () => {
     assert.deepEqual(days[1].lessons, []);
 });
 
+test('extracts only the full name from the school personal-data response', () => {
+    const html = '<table><tr><td>név<td>Verified Student</tr>' +
+        '<tr><td>other<td>ignored</tr></table>';
+
+    assert.equal(parseStudentName(html), 'Verified Student');
+    assert.throws(() => parseStudentName('<table><tr><td>other<td>ignored</tr></table>'));
+});
+
 test('verifies Firebase tokens and forwards only the signed-in profile identifiers', async () => {
     const originalFetch = globalThis.fetch;
     const projectId = env.FIREBASE_PROJECT_ID;
@@ -114,6 +122,17 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
             });
         }
         if (url === 'https://suli.ejg.hu/intranet/szulkuk/szulkuk.php') {
+            if (init.body.includes('&adatok=')) {
+                const bytes = new Uint8Array([
+                    ...new TextEncoder().encode('<table><tr><td>n'),
+                    0xe9,
+                    ...new TextEncoder().encode('v<td>Verified Student</tr>' +
+                        '<tr><td>other<td>ignored</tr></table>')
+                ]);
+                return new Response(bytes, {
+                    headers: { 'Content-Type': 'text/html; charset=iso-8859-2' }
+                });
+            }
             if (schoolStatus === 'network-error') throw new TypeError('network failure');
             if (schoolStatus !== 200) return new Response(null, { status: schoolStatus });
             const html = [
@@ -171,10 +190,28 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
             body: JSON.stringify({ ejgCode: 'MANUAL-EJG', omAzonosito: '54321' })
         }), env);
         assert.equal(inspectorResponse.status, 200);
-        const inspectorSchoolCall = calls.filter(({ url }) => url.includes('suli.ejg.hu')).at(-1);
+        assert.deepEqual(await inspectorResponse.json(), {
+            days: [
+                { name: 'HÉTFŐ', lessons: [{ period: 1, code: '1matA', subjectCode: 'mat', subject: 'Matematika', teacher: 'Teacher' }] },
+                { name: 'KEDD', lessons: [] },
+                { name: 'SZERDA', lessons: [] },
+                { name: 'CSÜTÖRTÖK', lessons: [] },
+                { name: 'PÉNTEK', lessons: [] }
+            ],
+            name: 'Verified Student'
+        });
+        const inspectorSchoolCalls = calls
+            .filter(({ url }) => url.includes('suli.ejg.hu'))
+            .slice(-2);
+        const inspectorSchoolCall = inspectorSchoolCalls[0];
         assert.match(inspectorSchoolCall.init.body, /EMAIL=X/);
         assert.match(inspectorSchoolCall.init.body, /DIAKKOD=MANUAL-EJG/);
         assert.match(inspectorSchoolCall.init.body, /OMKOD=54321/);
+        const inspectorNameCall = inspectorSchoolCalls[1];
+        assert.match(inspectorNameCall.init.body, /EMAIL=X/);
+        assert.match(inspectorNameCall.init.body, /DIAKKOD=MANUAL-EJG/);
+        assert.match(inspectorNameCall.init.body, /OMKOD=54321/);
+        assert.match(inspectorNameCall.init.body, /&adatok=V%E1laszt/);
 
         profileRole = 'user';
         const verificationResponse = await worker.fetch(new Request('https://worker.example/', {
@@ -191,11 +228,22 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
             })
         }), env);
         assert.equal(verificationResponse.status, 200);
-        assert.deepEqual(await verificationResponse.json(), { verified: true });
-        const verificationSchoolCall = calls.filter(({ url }) => url.includes('suli.ejg.hu')).at(-1);
+        assert.deepEqual(await verificationResponse.json(), {
+            verified: true,
+            name: 'Verified Student'
+        });
+        const verificationSchoolCalls = calls
+            .filter(({ url }) => url.includes('suli.ejg.hu'))
+            .slice(-2);
+        const verificationSchoolCall = verificationSchoolCalls[0];
         assert.match(verificationSchoolCall.init.body, /EMAIL=%28%3A/);
         assert.match(verificationSchoolCall.init.body, /DIAKKOD=ABCDEFGHIJKLM/);
         assert.match(verificationSchoolCall.init.body, /OMKOD=54321/);
+        const nameSchoolCall = verificationSchoolCalls[1];
+        assert.match(nameSchoolCall.init.body, /EMAIL=X/);
+        assert.match(nameSchoolCall.init.body, /DIAKKOD=ABCDEFGHIJKLM/);
+        assert.match(nameSchoolCall.init.body, /OMKOD=54321/);
+        assert.match(nameSchoolCall.init.body, /&adatok=V%E1laszt/);
 
         schoolStatus = 200;
         const fixtureFetch = globalThis.fetch;

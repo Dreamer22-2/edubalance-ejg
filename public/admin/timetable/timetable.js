@@ -88,7 +88,15 @@
                 timetable = responseData;
             }
 
-            results.replaceChildren(window.createTimetableElement(timetable.days));
+            if (typeof timetable.name !== 'string' || !timetable.name.trim()) {
+                throw Object.assign(new Error('The school did not return a student name.'), {
+                    code: 'failed-precondition'
+                });
+            }
+            const studentName = document.createElement('h2');
+            studentName.className = 'timetable-inspector-student-name';
+            studentName.textContent = timetable.name.trim();
+            results.replaceChildren(studentName, window.createTimetableElement(timetable.days));
             results.hidden = false;
         } catch (error) {
             const errorCode = typeof error.code === 'string'

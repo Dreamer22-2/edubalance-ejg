@@ -38,6 +38,18 @@ function subjectDetails(code) {
     };
 }
 
+function parseStudentName(html) {
+    const $ = cheerio.load(html);
+    const nameCell = $('td').filter((_, cell) =>
+        cellText(cell, $).toLocaleLowerCase('hu-HU') === 'név'
+    ).first();
+    const name = cellText(nameCell.next('td'), $);
+    if (!name || name.length > 120 || /[\u0000-\u001f]/.test(name)) {
+        throw new Error('The school response did not contain a valid full name.');
+    }
+    return name;
+}
+
 function parseTimetable(html) {
     const $ = cheerio.load(html);
     const rows = $('tr').toArray();
@@ -88,4 +100,4 @@ function parseTimetable(html) {
     return days;
 }
 
-module.exports = { parseTimetable };
+module.exports = { parseStudentName, parseTimetable };

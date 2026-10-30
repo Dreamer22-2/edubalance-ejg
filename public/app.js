@@ -398,6 +398,7 @@ function initializeProfileForm() {
         profileFields.disabled = true;
 
         try {
+            let verifiedName = '';
             if (ejgCode && omAzonosito) {
                 try {
                     if (location.hostname === 'localhost' ||
@@ -405,7 +406,8 @@ function initializeProfileForm() {
                         location.hostname.endsWith('.app.github.dev')) {
                         const callable = firebase.app().functions('europe-central2')
                             .httpsCallable('verifyMyTimetableIdentifiers');
-                        await callable({ ejgCode, omAzonosito });
+                        const verification = await callable({ ejgCode, omAzonosito });
+                        verifiedName = verification.data?.name;
                     } else {
                         const workerUrl = window.TIMETABLE_WORKER_URL;
                         if (typeof workerUrl !== 'string' || !workerUrl.startsWith('https://')) {
@@ -425,7 +427,16 @@ function initializeProfileForm() {
                                 code: responseData.error?.code || 'failed-precondition'
                             });
                         }
+                        verifiedName = responseData.name;
                     }
+                    if (typeof verifiedName !== 'string' ||
+                        !verifiedName.trim() ||
+                        verifiedName.trim().length > 120) {
+                        throw Object.assign(new Error('The school did not return a usable full name.'), {
+                            code: 'failed-precondition'
+                        });
+                    }
+                    verifiedName = verifiedName.trim();
                 } catch (error) {
                     console.error('School identifier verification failed:', {
                         code: error.code || 'unknown',
@@ -436,16 +447,20 @@ function initializeProfileForm() {
                 }
             }
 
-            await db.collection('users').doc(user.uid).update({
-                username: profileForm.querySelector('#profile-username').value.trim(),
-                schoolIdentifiers: { ejgCode, omAzonosito }
-            });
-            const updatedProfile = {
-                ...signedInProfile,
+            const profileUpdate = {
                 username: profileForm.querySelector('#profile-username').value.trim(),
                 schoolIdentifiers: { ejgCode, omAzonosito }
             };
+            if (verifiedName) profileUpdate.name = verifiedName;
+
+            await db.collection('users').doc(user.uid).update(profileUpdate);
+            const updatedProfile = {
+                ...signedInProfile,
+                ...profileUpdate
+            };
             signedInProfile = updatedProfile;
+            appMain.querySelector('#profile-full-name').textContent =
+                updatedProfile.name || user.displayName || 'Névtelen felhasználó';
             renderHeader(user);
             showToast('A profiladatok mentése sikerült.', 'success');
         } catch (error) {

@@ -502,6 +502,14 @@ button[hidden] {
     color: #a0aec0;
 }
 
+.timetable-inspector-student-name {
+    margin: 24px 0 16px;
+    color: #fff;
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-align: left;
+}
+
 .timetable-inspector-form {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

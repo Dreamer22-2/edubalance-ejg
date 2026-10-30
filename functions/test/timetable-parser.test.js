@@ -1,6 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseTimetable } = require('../timetable-parser');
+const { parseStudentName, parseTimetable } = require('../timetable-parser');
+
+test('extracts only the full name from the school personal-data response', () => {
+    const html = '<table><tr><td>név<td>Verified Student</tr>' +
+        '<tr><td>other<td>ignored</tr></table>';
+
+    assert.equal(parseStudentName(html), 'Verified Student');
+    assert.throws(() => parseStudentName('<table><tr><td>other<td>ignored</tr></table>'));
+});
 
 test('parses timetable periods, subjects, and teachers for each weekday', () => {
     const html = `

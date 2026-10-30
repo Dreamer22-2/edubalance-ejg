@@ -10,7 +10,8 @@ service cloud.firestore {
     // Document ID: Firebase Authentication UID
     // Fields:
     //   - uid: string, required, immutable, must match the document ID
-    //   - name: string, required, 1-120 characters
+    //   - name: string, required, 1-120 characters; refreshed from the school
+    //     portal when the user's school identifiers are verified
     //   - email: string, required, valid email, at most 254 characters
     //   - photoURL: string, required, empty or HTTP(S) URL, at most 2048 characters
     //   - role: string, required, one of visitor/user/admin/dev/owner
@@ -151,7 +152,7 @@ service cloud.firestore {
         return isOwner(userId) &&
           isDocOwner() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'username', 'schoolIdentifiers'
+          'name', 'username', 'schoolIdentifiers'
           ]);
     }
 

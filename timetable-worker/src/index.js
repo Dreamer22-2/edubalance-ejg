@@ -100,6 +100,18 @@ export function parseTimetable(html) {
     return days;
 }
 
+export function parseStudentName(html) {
+    const $ = load(html);
+    const nameCell = $('td').filter((_, cell) =>
+        $(cell).text().replace(/\s+/g, ' ').trim().toLocaleLowerCase('hu-HU') === 'név'
+    ).first();
+    const name = nameCell.next('td').text().replace(/\s+/g, ' ').trim();
+    if (!name || name.length > 120 || /[\u0000-\u001f]/.test(name)) {
+        throw new Error('The school response did not contain a valid full name.');
+    }
+    return name;
+}
+
 async function readBoundedBody(response, limit) {
     if (!response.body) throw new Error('Response body is unavailable.');
     const reader = response.body.getReader();
@@ -153,12 +165,12 @@ async function getOwnProfile(uid, token, projectId) {
     return response.json();
 }
 
-async function fetchTimetable(ejgCode, omAzonosito, email = '(:') {
+async function fetchSchoolResponse(ejgCode, omAzonosito, action, email = '(:') {
     const encodedEmail = encodeURIComponent(email).replace(/[!'()*]/g, (character) =>
         `%${character.charCodeAt(0).toString(16).toUpperCase()}`
     );
     const requestBody = `EMAIL=${encodedEmail}&DIAKKOD=${encodeURIComponent(ejgCode)}` +
-        `&OMKOD=${encodeURIComponent(omAzonosito)}&orarend=V%E1laszt`;
+        `&OMKOD=${encodeURIComponent(omAzonosito)}&${action}=V%E1laszt`;
     let response;
     try {
         response = await fetch(timetableEndpoint, {
@@ -174,7 +186,7 @@ async function fetchTimetable(ejgCode, omAzonosito, email = '(:') {
         });
     } catch (error) {
         const cause = error.cause;
-        console.error('School timetable fetch failed:', {
+        console.error('School portal request failed:', {
             errorName: error.name || 'Error',
             errorMessage: typeof error.message === 'string' ? error.message.slice(0, 160) : '',
             causeName: typeof cause?.name === 'string' ? cause.name.slice(0, 80) : '',
@@ -187,25 +199,46 @@ async function fetchTimetable(ejgCode, omAzonosito, email = '(:') {
         });
     }
     if (!response.ok) {
-        console.error('School timetable endpoint returned an unsuccessful status:', response.status);
+        console.error('School portal endpoint returned an unsuccessful status:', response.status);
         throw Object.assign(new Error('School timetable service is unavailable.'), {
             code: 'school-upstream-rejected',
             status: 503
         });
     }
 
+    const responseLimit = action === 'adatok' ? 16384 : 512000;
     const contentType = response.headers.get('content-type') || '';
     const contentLength = Number(response.headers.get('content-length') || 0);
     if (!/text\/html|application\/xhtml\+xml/i.test(contentType) ||
-        contentLength > 512000) {
+        contentLength > responseLimit) {
         throw Object.assign(new Error('Unexpected school response.'), {
             code: 'internal',
             status: 502
         });
     }
 
-    const html = new TextDecoder('windows-1250', { fatal: true })
-        .decode(await readBoundedBody(response, 512000));
+    const charset = contentType.match(/charset\s*=\s*"?([^;"\s]+)/i)?.[1]?.toLowerCase() ||
+        'windows-1250';
+    if (!['windows-1250', 'cp1250', 'iso-8859-2', 'utf-8'].includes(charset)) {
+        throw Object.assign(new Error('Unsupported school response encoding.'), {
+            code: 'internal',
+            status: 502
+        });
+    }
+
+    const responseBytes = await readBoundedBody(response, responseLimit);
+    try {
+        return new TextDecoder(charset, { fatal: true }).decode(responseBytes);
+    } catch {
+        throw Object.assign(new Error('The school response could not be decoded.'), {
+            code: 'internal',
+            status: 502
+        });
+    }
+}
+
+async function fetchTimetable(ejgCode, omAzonosito, email = '(:') {
+    const html = await fetchSchoolResponse(ejgCode, omAzonosito, 'orarend', email);
     if (!/<big\b/i.test(html) || !/órarendje\s*<\/big>/i.test(html)) {
         throw Object.assign(new Error('School timetable was not found.'), {
             code: 'failed-precondition',
@@ -217,6 +250,18 @@ async function fetchTimetable(ejgCode, omAzonosito, email = '(:') {
         return { days: parseTimetable(html) };
     } catch {
         throw Object.assign(new Error('School timetable response could not be parsed.'), {
+            code: 'failed-precondition',
+            status: 422
+        });
+    }
+}
+
+async function fetchStudentName(ejgCode, omAzonosito) {
+    const html = await fetchSchoolResponse(ejgCode, omAzonosito, 'adatok', 'X');
+    try {
+        return parseStudentName(html);
+    } catch {
+        throw Object.assign(new Error('The school did not return a usable full name.'), {
             code: 'failed-precondition',
             status: 422
         });
@@ -343,11 +388,19 @@ export default {
 
             try {
                 const timetable = await fetchTimetable(ejgCode, omAzonosito, email);
-                return jsonResponse(
-                    isVerificationRequest ? { verified: true } : timetable,
-                    200,
-                    headers
-                );
+                if (isVerificationRequest) {
+                    return jsonResponse({
+                        verified: true,
+                        name: await fetchStudentName(ejgCode, omAzonosito)
+                    }, 200, headers);
+                }
+                if (isInspectorRequest) {
+                    return jsonResponse({
+                        ...timetable,
+                        name: await fetchStudentName(ejgCode, omAzonosito)
+                    }, 200, headers);
+                }
+                return jsonResponse(timetable, 200, headers);
             } catch (error) {
                 if (error.code && error.status) throw error;
                 console.error('Timetable Worker school request failed:', error.name || 'Error');
