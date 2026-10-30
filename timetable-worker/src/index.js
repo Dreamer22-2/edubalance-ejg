@@ -160,7 +160,7 @@ async function fetchTimetable(ejgCode, omAzonosito) {
     try {
         response = await fetch(timetableEndpoint, {
             method: 'POST',
-            redirect: 'error',
+            redirect: 'manual',
             signal: AbortSignal.timeout(12000),
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',

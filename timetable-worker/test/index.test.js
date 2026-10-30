@@ -154,6 +154,7 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
         assert.equal(firestoreCall.init.headers.Authorization, `Bearer ${token}`);
         const schoolCall = calls.find(({ url }) => url.includes('suli.ejg.hu'));
         assert.ok(schoolCall);
+        assert.equal(schoolCall.init.redirect, 'manual');
         assert.match(schoolCall.init.body, /DIAKKOD=TEST-EJG/);
         assert.match(schoolCall.init.body, /OMKOD=12345/);
 
