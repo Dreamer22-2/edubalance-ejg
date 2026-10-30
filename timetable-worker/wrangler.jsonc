@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "edubalance-timetable",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-19",
+  "vars": {
+    "FIREBASE_PROJECT_ID": "edubalance-ejg",
+    "ALLOWED_ORIGINS": "https://edubalance-ejg.web.app,https://edubalance-ejg.firebaseapp.com"
+  }
+}

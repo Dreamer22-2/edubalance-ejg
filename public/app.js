@@ -404,15 +404,44 @@ function initializeTimetable() {
             'functions/unauthenticated': 'Az órarend betöltéséhez jelentkezz be újra.',
             'functions/permission-denied': 'Ehhez a fiókhoz nincs jogosultság az órarend lekérésére.',
             'functions/resource-exhausted': 'Az iskola túl nagy választ küldött. Próbáld újra később.',
-            'functions/internal': 'Az órarend feldolgozása nem sikerült. Ellenőrizd a Functions emulator naplóját.'
+            'functions/internal': 'Az órarend feldolgozása nem sikerült. Próbáld újra később.'
         };
 
         (async () => {
             try {
-                const callable = firebase.app().functions('europe-central2').httpsCallable('getMyTimetable');
-                const response = await callable({});
+                let timetable;
+                if (location.hostname === 'localhost' ||
+                    location.hostname === '127.0.0.1' ||
+                    location.hostname.endsWith('.app.github.dev')) {
+                    const callable = firebase.app().functions('europe-central2').httpsCallable('getMyTimetable');
+                    const response = await callable({});
+                    timetable = response.data;
+                } else {
+                    const workerUrl = window.TIMETABLE_WORKER_URL;
+                    if (typeof workerUrl !== 'string' || !workerUrl.startsWith('https://')) {
+                        throw Object.assign(new Error('Timetable service is not configured.'), {
+                            code: 'functions/unavailable'
+                        });
+                    }
+                    const idToken = await user.getIdToken();
+                    const response = await fetch(workerUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${idToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: '{}'
+                    });
+                    const responseData = await response.json();
+                    if (!response.ok) {
+                        throw Object.assign(new Error('Timetable service request failed.'), {
+                            code: `functions/${responseData.error?.code || 'internal'}`
+                        });
+                    }
+                    timetable = responseData;
+                }
                 if (requestSequence !== currentRequest || auth.currentUser?.uid !== uid) return;
-                render(response.data?.days);
+                render(timetable?.days);
             } catch (error) {
                 if (requestSequence !== currentRequest || auth.currentUser?.uid !== uid) return;
                 console.error('Failed to load the signed-in user timetable:', error);

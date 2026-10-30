@@ -709,6 +709,12 @@ button[hidden] {
     border-radius: 8px;
 }
 
+@media (max-width: 480px) {
+    .profile-fields .save-btn {
+        justify-self: center;
+    }
+}
+
 .admin-header h1 {
     margin-top: 0;
     margin-bottom: 24px;
