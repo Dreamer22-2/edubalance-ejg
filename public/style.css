@@ -1287,6 +1287,14 @@ select:disabled {
     margin-top: 0;
 }
 
+.user-details-inspector-action {
+    display: none;
+}
+
+.user-details-row.expanded .user-details-inspector-action {
+    display: block;
+}
+
 .user-details-row.expanded .details-content {
     opacity: 1;
     transition-delay: 0.1s;

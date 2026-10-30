@@ -58,6 +58,12 @@ function initializeUserList() {
                 event
             );
         }
+
+        const inspectorButton = event.target.closest('.send-to-timetable-inspector');
+        if (inspectorButton) {
+            event.stopPropagation();
+            sendCodesToTimetableInspector(inspectorButton.dataset.userId);
+        }
     });
     refreshButton.addEventListener('click', () => loadNextUserBatch(true));
     loadMoreButton.addEventListener('click', () => {
@@ -292,6 +298,10 @@ function renderTable(users) {
         const photoURL = typeof userData.photoURL === 'string' ? userData.photoURL.trim() : '';
         const monogram = getMonogram(primaryName);
         const schoolIdentifiers = getSchoolIdentifiers(userData);
+        const hasSchoolIdentifiers = typeof schoolIdentifiers.ejgCode === 'string' &&
+            schoolIdentifiers.ejgCode.trim().length > 0 &&
+            typeof schoolIdentifiers.omAzonosito === 'string' &&
+            schoolIdentifiers.omAzonosito.trim().length > 0;
         const profileIdentifiers = [
             renderProfileDetail('EJG-kód', schoolIdentifiers.ejgCode, 'EJG-kód másolva'),
             renderProfileDetail('OM azonosító', schoolIdentifiers.omAzonosito, 'OM azonosító másolva')
@@ -361,6 +371,14 @@ function renderTable(users) {
                             <button class="save-btn copy-btn" onclick="copyToClipboard('${userId}', 'UUID másolva', event)" title="UUID másolása">Másolás</button>
                         </div>
                         <div class="user-details-created"><strong>Létrehozva:</strong> ${createdAtFormatted}</div>
+                        <div class="user-details-inspector-action">
+                            <button
+                                class="save-btn send-to-timetable-inspector"
+                                type="button"
+                                data-user-id="${escapeHtml(userId)}"
+                                ${hasSchoolIdentifiers ? '' : 'disabled title="A felhasználónak mindkét iskolai azonosítót el kell mentenie."'}
+                            >Kódok küldése az órarend-ellenőrzőbe</button>
+                        </div>
                     </div>
                 </div>
             </td>
@@ -373,6 +391,35 @@ function renderTable(users) {
         usersTableBody.appendChild(trMain);
         usersTableBody.appendChild(trDetails);
     });
+}
+
+function sendCodesToTimetableInspector(userId) {
+    const user = allUsersData.find((entry) => entry.id === userId);
+    if (!user) {
+        showToast('A felhasználó már nincs a betöltött listában. Frissítsd a listát.', 'error');
+        return;
+    }
+
+    const identifiers = getSchoolIdentifiers(user);
+    const ejgCode = typeof identifiers.ejgCode === 'string' ? identifiers.ejgCode.trim() : '';
+    const omAzonosito = typeof identifiers.omAzonosito === 'string'
+        ? identifiers.omAzonosito.trim()
+        : '';
+    if (!ejgCode || !omAzonosito) {
+        showToast('A felhasználónak mindkét iskolai azonosítót el kell mentenie.', 'error');
+        return;
+    }
+
+    try {
+        sessionStorage.setItem('timetable-inspector-prefill', JSON.stringify({
+            ejgCode,
+            omAzonosito
+        }));
+        window.location.assign('/admin/timetable/');
+    } catch (error) {
+        console.error('Could not send school identifiers to timetable inspector:', error);
+        showToast('Nem sikerült megnyitni az órarend-ellenőrzőt.', 'error');
+    }
 }
 
 window.copyToClipboard = function(text, successMessage, event) {

@@ -9,45 +9,13 @@ initializeApp();
 const database = getFirestore();
 const timetableEndpoint = 'https://suli.ejg.hu/intranet/szulkuk/szulkuk.php';
 const allowedRoles = ['user', 'admin', 'dev', 'owner'];
+const privilegedRoles = ['admin', 'dev', 'owner'];
 
-exports.getMyTimetable = onCall({
-    region: 'europe-central2',
-    timeoutSeconds: 20,
-    memory: '256MiB',
-    maxInstances: 10
-}, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'A timetable requires a signed-in account.');
-    }
-    if (request.data && Object.keys(request.data).length > 0) {
-        throw new HttpsError('invalid-argument', 'The timetable request must not include profile data.');
-    }
-
-    const profileSnapshot = await database.collection('users').doc(request.auth.uid).get();
-    if (!profileSnapshot.exists) {
-        throw new HttpsError('failed-precondition', 'The signed-in user profile was not found.');
-    }
-
-    const profile = profileSnapshot.data();
-    if (!allowedRoles.includes(profile.role)) {
-        throw new HttpsError('permission-denied', 'This account cannot access a student timetable.');
-    }
-
-    const identifiers = profile.schoolIdentifiers;
-    if (!identifiers ||
-        typeof identifiers.ejgCode !== 'string' ||
-        typeof identifiers.omAzonosito !== 'string') {
-        throw new HttpsError('failed-precondition', 'Add both school identifiers in your profile first.');
-    }
-    const ejgCode = identifiers.ejgCode.trim();
-    const omAzonosito = identifiers.omAzonosito.trim();
-    if (!ejgCode || !omAzonosito ||
-        ejgCode.length > 40 ||
-        omAzonosito.length > 20) {
-        throw new HttpsError('failed-precondition', 'Add both school identifiers in your profile first.');
-    }
-
-    const requestBody = `EMAIL=%28%3A&DIAKKOD=${encodeURIComponent(ejgCode)}` +
+async function fetchAndParseTimetable(ejgCode, omAzonosito, email = '(:') {
+    const encodedEmail = encodeURIComponent(email).replace(/[!'()*]/g, (character) =>
+        `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+    );
+    const requestBody = `EMAIL=${encodedEmail}&DIAKKOD=${encodeURIComponent(ejgCode)}` +
         `&OMKOD=${encodeURIComponent(omAzonosito)}&orarend=V%E1laszt`;
 
     let upstreamResponse;
@@ -86,9 +54,7 @@ exports.getMyTimetable = onCall({
     let responseBytes;
     try {
         const reader = upstreamResponse.body?.getReader();
-        if (!reader) {
-            throw new Error('The response body is unavailable.');
-        }
+        if (!reader) throw new Error('The response body is unavailable.');
         const chunks = [];
         let totalBytes = 0;
         while (true) {
@@ -139,4 +105,78 @@ exports.getMyTimetable = onCall({
         });
         throw new HttpsError('failed-precondition', 'The school did not return a recognizable timetable.');
     }
+}
+
+exports.getMyTimetable = onCall({
+    region: 'europe-central2',
+    timeoutSeconds: 20,
+    memory: '256MiB',
+    maxInstances: 10
+}, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'A timetable requires a signed-in account.');
+    }
+    if (request.data && Object.keys(request.data).length > 0) {
+        throw new HttpsError('invalid-argument', 'The timetable request must not include profile data.');
+    }
+
+    const profileSnapshot = await database.collection('users').doc(request.auth.uid).get();
+    if (!profileSnapshot.exists) {
+        throw new HttpsError('failed-precondition', 'The signed-in user profile was not found.');
+    }
+
+    const profile = profileSnapshot.data();
+    if (!allowedRoles.includes(profile.role)) {
+        throw new HttpsError('permission-denied', 'This account cannot access a student timetable.');
+    }
+
+    const identifiers = profile.schoolIdentifiers;
+    if (!identifiers ||
+        typeof identifiers.ejgCode !== 'string' ||
+        typeof identifiers.omAzonosito !== 'string') {
+        throw new HttpsError('failed-precondition', 'Add both school identifiers in your profile first.');
+    }
+    const ejgCode = identifiers.ejgCode.trim();
+    const omAzonosito = identifiers.omAzonosito.trim();
+    if (!ejgCode || !omAzonosito ||
+        ejgCode.length > 40 ||
+        omAzonosito.length > 20) {
+        throw new HttpsError('failed-precondition', 'Add both school identifiers in your profile first.');
+    }
+
+    return fetchAndParseTimetable(ejgCode, omAzonosito);
+});
+
+exports.getTimetableForInspector = onCall({
+    region: 'europe-central2',
+    timeoutSeconds: 20,
+    memory: '256MiB',
+    maxInstances: 10
+}, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'A timetable requires a signed-in account.');
+    }
+
+    const input = request.data;
+    if (!input ||
+        typeof input !== 'object' ||
+        Array.isArray(input) ||
+        Object.keys(input).length !== 2 ||
+        typeof input.ejgCode !== 'string' ||
+        typeof input.omAzonosito !== 'string') {
+        throw new HttpsError('invalid-argument', 'Provide an EJG code and a five-digit OM identifier.');
+    }
+
+    const profileSnapshot = await database.collection('users').doc(request.auth.uid).get();
+    if (!profileSnapshot.exists || !privilegedRoles.includes(profileSnapshot.data().role)) {
+        throw new HttpsError('permission-denied', 'An administrator role is required for timetable inspection.');
+    }
+
+    const ejgCode = input.ejgCode.trim();
+    const omAzonosito = input.omAzonosito.trim();
+    if (!ejgCode || ejgCode.length > 40 || !/^\d{5}$/.test(omAzonosito)) {
+        throw new HttpsError('invalid-argument', 'Provide a valid EJG code and a five-digit OM identifier.');
+    }
+
+    return fetchAndParseTimetable(ejgCode, omAzonosito, 'X');
 });

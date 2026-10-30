@@ -22,6 +22,7 @@
                 return;
             }
             content.hidden = false;
+            prefillFromUserList();
         } catch (error) {
             console.error('Failed to authorize timetable inspector:', {
                 code: error.code || 'unknown',
@@ -48,36 +49,53 @@
         results.replaceChildren();
 
         try {
-            const workerUrl = window.TIMETABLE_WORKER_URL;
-            if (typeof workerUrl !== 'string' || !workerUrl.startsWith('https://')) {
-                throw Object.assign(new Error('Timetable service is not configured.'), {
-                    code: 'unavailable'
-                });
-            }
-
-            const response = await fetch(workerUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${await user.getIdToken()}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+            let timetable;
+            if (location.hostname === 'localhost' ||
+                location.hostname === '127.0.0.1' ||
+                location.hostname.endsWith('.app.github.dev')) {
+                const callable = firebase.app().functions('europe-central2')
+                    .httpsCallable('getTimetableForInspector');
+                const response = await callable({
                     ejgCode: form.elements.ejgCode.value.trim(),
                     omAzonosito: form.elements.omAzonosito.value.trim()
-                })
-            });
-            const responseData = await response.json();
-            if (!response.ok) {
-                throw Object.assign(new Error('Timetable service request failed.'), {
-                    code: responseData.error?.code || 'internal'
                 });
+                timetable = response.data;
+            } else {
+                const workerUrl = window.TIMETABLE_WORKER_URL;
+                if (typeof workerUrl !== 'string' || !workerUrl.startsWith('https://')) {
+                    throw Object.assign(new Error('Timetable service is not configured.'), {
+                        code: 'unavailable'
+                    });
+                }
+
+                const response = await fetch(workerUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${await user.getIdToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        ejgCode: form.elements.ejgCode.value.trim(),
+                        omAzonosito: form.elements.omAzonosito.value.trim()
+                    })
+                });
+                const responseData = await response.json();
+                if (!response.ok) {
+                    throw Object.assign(new Error('Timetable service request failed.'), {
+                        code: responseData.error?.code || 'internal'
+                    });
+                }
+                timetable = responseData;
             }
 
-            results.replaceChildren(window.createTimetableElement(responseData.days));
+            results.replaceChildren(window.createTimetableElement(timetable.days));
             results.hidden = false;
         } catch (error) {
+            const errorCode = typeof error.code === 'string'
+                ? error.code.replace(/^functions\//, '')
+                : 'unknown';
             console.error('Timetable inspector request failed:', {
-                code: error.code || 'unknown',
+                code: errorCode,
                 message: error.message || 'No error message'
             });
             const message = {
@@ -90,12 +108,40 @@
                 'profile-unavailable': 'A profiladatok most nem érhetők el.',
                 unavailable: 'Az órarend-szolgáltatás most nem érhető el.',
                 internal: 'Az órarend feldolgozása nem sikerült.'
-            }[error.code] || 'Nem sikerült lekérni az órarendet.';
+            }[errorCode] || 'Nem sikerült lekérni az órarendet.';
             showToast(message, 'error');
         } finally {
             submitButton.disabled = false;
             loading.hidden = true;
         }
     });
+
+    function prefillFromUserList() {
+        const storageKey = 'timetable-inspector-prefill';
+        let serialized;
+        try {
+            serialized = sessionStorage.getItem(storageKey);
+            if (serialized === null) return;
+            sessionStorage.removeItem(storageKey);
+        } catch (error) {
+            console.error('Could not read timetable inspector prefill:', error);
+            showToast('Nem sikerült betölteni a kiválasztott felhasználó kódjait.', 'error');
+            return;
+        }
+
+        try {
+            const identifiers = JSON.parse(serialized);
+            if (typeof identifiers?.ejgCode !== 'string' ||
+                typeof identifiers?.omAzonosito !== 'string') {
+                throw new Error('Invalid timetable inspector prefill.');
+            }
+            form.elements.ejgCode.value = identifiers.ejgCode;
+            form.elements.omAzonosito.value = identifiers.omAzonosito;
+            form.requestSubmit();
+        } catch (error) {
+            console.error('Invalid timetable inspector prefill:', error);
+            showToast('Nem sikerült betölteni a kiválasztott felhasználó kódjait.', 'error');
+        }
+    }
 
 })();
