@@ -231,31 +231,39 @@ function initializeAppShell() {
 
 async function ensureUserProfile(user) {
     const userRef = db.collection('users').doc(user.uid);
-    const userSnapshot = await userRef.get();
-    const isSchoolUser = user.emailVerified && schoolEmailPattern.test(user.email || '');
-    let profile;
+    let profileOperation = 'read';
+    try {
+        const userSnapshot = await userRef.get();
+        const isSchoolUser = user.emailVerified && schoolEmailPattern.test(user.email || '');
+        let profile;
 
-    if (!userSnapshot.exists) {
-        profile = {
-            uid: user.uid,
-            name: user.displayName || 'Névtelen felhasználó',
-            email: user.email || '',
-            photoURL: user.photoURL || '',
-            role: isSchoolUser ? 'user' : 'visitor',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        await userRef.set(profile);
+        if (!userSnapshot.exists) {
+            profile = {
+                uid: user.uid,
+                name: user.displayName || 'Névtelen felhasználó',
+                email: user.email || '',
+                photoURL: user.photoURL || '',
+                role: isSchoolUser ? 'user' : 'visitor',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            profileOperation = 'create';
+            await userRef.set(profile);
+            return profile;
+        }
+
+        profile = userSnapshot.data();
+        if (isSchoolUser && profile.role === 'visitor') {
+            profileOperation = 'promote-school-user';
+            await userRef.update({ role: 'user' });
+            profile.role = 'user';
+        }
+
+        profile.role = profile.role || 'visitor';
         return profile;
+    } catch (error) {
+        error.profileOperation = profileOperation;
+        throw error;
     }
-
-    profile = userSnapshot.data();
-    if (isSchoolUser && profile.role === 'visitor') {
-        await userRef.update({ role: 'user' });
-        profile.role = 'user';
-    }
-
-    profile.role = profile.role || 'visitor';
-    return profile;
 }
 
 async function loadProfileSettings(user) {
@@ -636,7 +644,11 @@ auth.onAuthStateChanged(async (user) => {
         }
         updateTimetableAvailability?.(signedInProfile);
     } catch (error) {
-        console.error('Failed to load or create the user profile:', error);
+        console.error('Failed to load or create the user profile:', {
+            operation: error.profileOperation || 'profile-processing',
+            code: error.code || 'unknown',
+            message: error.message || 'No error message'
+        });
         showToast('Nem sikerült betölteni a felhasználói jogosultságokat.', 'error');
         appMain.querySelector('#profile-page-btn').hidden = true;
         renderSidebar('visitor');
