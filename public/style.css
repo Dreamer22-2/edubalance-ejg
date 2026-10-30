@@ -12,6 +12,25 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+a {
+    color: #2ed591;
+    text-decoration: underline;
+    text-decoration-color: rgba(46, 213, 145, 0.55);
+    text-underline-offset: 0.18em;
+    transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+a:hover {
+    color: #8af0c1;
+    text-decoration-color: currentColor;
+}
+
+a:focus-visible {
+    border-radius: 2px;
+    outline: 2px solid #2ed591;
+    outline-offset: 3px;
+}
+
 .admin-layout {
     display: flex;
     min-height: 100vh;
