@@ -87,6 +87,8 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
     publicJwk.kid = 'worker-test-key';
     publicJwk.alg = 'RS256';
     const calls = [];
+    let firestoreStatus = 200;
+    let schoolStatus = 200;
 
     globalThis.fetch = async (input, init = {}) => {
         const url = String(input);
@@ -95,6 +97,7 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
             return Response.json({ keys: [publicJwk] });
         }
         if (url.includes(`/documents/users/${uid}`)) {
+            if (firestoreStatus !== 200) return new Response(null, { status: firestoreStatus });
             return Response.json({
                 fields: {
                     role: { stringValue: 'user' },
@@ -110,6 +113,7 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
             });
         }
         if (url === 'https://suli.ejg.hu/intranet/szulkuk/szulkuk.php') {
+            if (schoolStatus !== 200) return new Response(null, { status: schoolStatus });
             const html = [
                 ...new TextEncoder().encode('<big>'),
                 0xf3,
@@ -172,6 +176,37 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
         assert.equal(wrongProjectResponse.status, 401);
         assert.deepEqual(await wrongProjectResponse.json(), {
             error: { code: 'unauthenticated' }
+        });
+
+        firestoreStatus = 403;
+        const deniedProfileResponse = await worker.fetch(new Request('https://worker.example/', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://edubalance-ejg.web.app',
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: '{}'
+        }), env);
+        assert.equal(deniedProfileResponse.status, 403);
+        assert.deepEqual(await deniedProfileResponse.json(), {
+            error: { code: 'profile-permission-denied' }
+        });
+
+        firestoreStatus = 200;
+        schoolStatus = 503;
+        const unavailableSchoolResponse = await worker.fetch(new Request('https://worker.example/', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://edubalance-ejg.web.app',
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: '{}'
+        }), env);
+        assert.equal(unavailableSchoolResponse.status, 503);
+        assert.deepEqual(await unavailableSchoolResponse.json(), {
+            error: { code: 'school-unavailable' }
         });
     } finally {
         globalThis.fetch = originalFetch;

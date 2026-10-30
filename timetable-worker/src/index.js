@@ -138,27 +138,46 @@ async function getOwnProfile(uid, token, projectId) {
         }
     );
     if (response.status === 404) return null;
-    if (!response.ok) throw new Error('Could not read the signed-in user profile.');
+    if (response.status === 401 || response.status === 403) {
+        throw Object.assign(new Error('Could not access the signed-in user profile.'), {
+            code: 'profile-permission-denied',
+            status: 403
+        });
+    }
+    if (!response.ok) {
+        throw Object.assign(new Error('Could not read the signed-in user profile.'), {
+            code: 'profile-unavailable',
+            status: 503
+        });
+    }
     return response.json();
 }
 
 async function fetchTimetable(ejgCode, omAzonosito) {
     const requestBody = `EMAIL=%28%3A&DIAKKOD=${encodeURIComponent(ejgCode)}` +
         `&OMKOD=${encodeURIComponent(omAzonosito)}&orarend=V%E1laszt`;
-    const response = await fetch(timetableEndpoint, {
-        method: 'POST',
-        redirect: 'error',
-        signal: AbortSignal.timeout(12000),
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Referer': 'https://suli.ejg.hu/intranet/szulkuk/menu.php'
-        },
-        body: requestBody
-    });
+    let response;
+    try {
+        response = await fetch(timetableEndpoint, {
+            method: 'POST',
+            redirect: 'error',
+            signal: AbortSignal.timeout(12000),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Referer': 'https://suli.ejg.hu/intranet/szulkuk/menu.php'
+            },
+            body: requestBody
+        });
+    } catch {
+        throw Object.assign(new Error('School timetable service is unavailable.'), {
+            code: 'school-unavailable',
+            status: 503
+        });
+    }
     if (!response.ok) {
-        throw Object.assign(new Error('School timetable service unavailable.'), {
-            code: 'unavailable',
+        throw Object.assign(new Error('School timetable service is unavailable.'), {
+            code: 'school-unavailable',
             status: 503
         });
     }
@@ -251,7 +270,17 @@ export default {
                 return jsonResponse({ error: { code: 'unauthenticated' } }, 401, headers);
             }
 
-            const profile = await getOwnProfile(uid, tokenMatch[1], env.FIREBASE_PROJECT_ID);
+            let profile;
+            try {
+                profile = await getOwnProfile(uid, tokenMatch[1], env.FIREBASE_PROJECT_ID);
+            } catch (error) {
+                if (error.code && error.status) throw error;
+                console.error('Timetable Worker profile lookup failed:', error.name || 'Error');
+                throw Object.assign(new Error('Profile service is unavailable.'), {
+                    code: 'profile-unavailable',
+                    status: 503
+                });
+            }
             if (!profile) {
                 return jsonResponse({ error: { code: 'failed-precondition' } }, 412, headers);
             }
@@ -266,16 +295,23 @@ export default {
                 return jsonResponse({ error: { code: 'failed-precondition' } }, 412, headers);
             }
 
-            return jsonResponse(await fetchTimetable(ejgCode, omAzonosito), 200, headers);
+            try {
+                return jsonResponse(await fetchTimetable(ejgCode, omAzonosito), 200, headers);
+            } catch (error) {
+                if (error.code && error.status) throw error;
+                console.error('Timetable Worker school request failed:', error.name || 'Error');
+                throw Object.assign(new Error('School timetable service is unavailable.'), {
+                    code: 'school-unavailable',
+                    status: 503
+                });
+            }
         } catch (error) {
             if (error.code && error.status) {
                 return jsonResponse({ error: { code: error.code } }, error.status, headers);
             }
             const invalidToken = error.code?.startsWith('ERR_JWT_') ||
                 error.code?.startsWith('ERR_JWS_');
-            if (!invalidToken) {
-                console.error('Timetable worker request failed:', error.name || 'Error');
-            }
+            if (!invalidToken) console.error('Timetable worker request failed:', error.name || 'Error');
             const status = invalidToken ? 401 : 503;
             return jsonResponse({
                 error: {

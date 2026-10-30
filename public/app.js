@@ -412,6 +412,9 @@ function initializeTimetable() {
             'functions/unauthenticated': 'Az órarend betöltéséhez jelentkezz be újra.',
             'functions/permission-denied': 'Ehhez a fiókhoz nincs jogosultság az órarend lekérésére.',
             'functions/resource-exhausted': 'Az iskola túl nagy választ küldött. Próbáld újra később.',
+            'functions/profile-permission-denied': 'Nem sikerült hozzáférni a profilhoz. Ellenőrizd a Firestore szabályokat.',
+            'functions/profile-unavailable': 'A profiladatok most nem érhetők el. Próbáld újra később.',
+            'functions/school-unavailable': 'Az iskola órarend-szolgáltatása most nem érhető el. Próbáld újra később.',
             'functions/internal': 'Az órarend feldolgozása nem sikerült. Próbáld újra később.'
         };
 
@@ -443,7 +446,8 @@ function initializeTimetable() {
                     const responseData = await response.json();
                     if (!response.ok) {
                         throw Object.assign(new Error('Timetable service request failed.'), {
-                            code: `functions/${responseData.error?.code || 'internal'}`
+                            code: `functions/${responseData.error?.code || 'internal'}`,
+                            status: response.status
                         });
                     }
                     timetable = responseData;
@@ -452,7 +456,11 @@ function initializeTimetable() {
                 render(timetable?.days);
             } catch (error) {
                 if (requestSequence !== currentRequest || auth.currentUser?.uid !== uid) return;
-                console.error('Failed to load the signed-in user timetable:', error);
+                console.error('Failed to load the signed-in user timetable:', {
+                    code: error?.code || 'unknown',
+                    status: error?.status || null,
+                    message: error?.message || 'No error message'
+                });
                 showToast(
                     errorMessages[error?.code] || 'Nem sikerült betölteni az órarendet. Próbáld újra később.',
                     'error'
