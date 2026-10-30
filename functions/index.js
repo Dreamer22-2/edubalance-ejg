@@ -147,6 +147,41 @@ exports.getMyTimetable = onCall({
     return fetchAndParseTimetable(ejgCode, omAzonosito);
 });
 
+exports.verifyMyTimetableIdentifiers = onCall({
+    region: 'europe-central2',
+    timeoutSeconds: 20,
+    memory: '256MiB',
+    maxInstances: 10
+}, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'A timetable requires a signed-in account.');
+    }
+
+    const input = request.data;
+    if (!input ||
+        typeof input !== 'object' ||
+        Array.isArray(input) ||
+        Object.keys(input).length !== 2 ||
+        typeof input.ejgCode !== 'string' ||
+        typeof input.omAzonosito !== 'string') {
+        throw new HttpsError('invalid-argument', 'Provide an EJG code and a five-digit OM identifier.');
+    }
+
+    const profileSnapshot = await database.collection('users').doc(request.auth.uid).get();
+    if (!profileSnapshot.exists || !allowedRoles.includes(profileSnapshot.data().role)) {
+        throw new HttpsError('permission-denied', 'A school account is required to verify these identifiers.');
+    }
+
+    const ejgCode = input.ejgCode.trim();
+    const omAzonosito = input.omAzonosito.trim();
+    if (ejgCode.length !== 13 || !/^\d{5}$/.test(omAzonosito)) {
+        throw new HttpsError('invalid-argument', 'Provide a 13-character EJG code and a five-digit OM identifier.');
+    }
+
+    await fetchAndParseTimetable(ejgCode, omAzonosito);
+    return { verified: true };
+});
+
 exports.getTimetableForInspector = onCall({
     region: 'europe-central2',
     timeoutSeconds: 20,

@@ -176,6 +176,76 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
         assert.match(inspectorSchoolCall.init.body, /DIAKKOD=MANUAL-EJG/);
         assert.match(inspectorSchoolCall.init.body, /OMKOD=54321/);
 
+        profileRole = 'user';
+        const verificationResponse = await worker.fetch(new Request('https://worker.example/', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://edubalance-ejg.web.app',
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'verify',
+                ejgCode: 'ABCDEFGHIJKLM',
+                omAzonosito: '54321'
+            })
+        }), env);
+        assert.equal(verificationResponse.status, 200);
+        assert.deepEqual(await verificationResponse.json(), { verified: true });
+        const verificationSchoolCall = calls.filter(({ url }) => url.includes('suli.ejg.hu')).at(-1);
+        assert.match(verificationSchoolCall.init.body, /EMAIL=%28%3A/);
+        assert.match(verificationSchoolCall.init.body, /DIAKKOD=ABCDEFGHIJKLM/);
+        assert.match(verificationSchoolCall.init.body, /OMKOD=54321/);
+
+        schoolStatus = 200;
+        const fixtureFetch = globalThis.fetch;
+        globalThis.fetch = async (input, init = {}) => {
+            if (String(input) === 'https://suli.ejg.hu/intranet/szulkuk/szulkuk.php' &&
+                init.body.includes('DIAKKOD=INVALIDCODE')) {
+                return new Response('<html><body>No timetable</body></html>', {
+                    headers: { 'Content-Type': 'text/html; charset=windows-1250' }
+                });
+            }
+            return fixtureFetch(input, init);
+        };
+        const rejectedVerificationResponse = await worker.fetch(new Request('https://worker.example/', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://edubalance-ejg.web.app',
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'verify',
+                ejgCode: 'INVALIDCODE12',
+                omAzonosito: '54321'
+            })
+        }), env);
+        assert.equal(rejectedVerificationResponse.status, 422);
+        assert.deepEqual(await rejectedVerificationResponse.json(), {
+            error: { code: 'failed-precondition' }
+        });
+        globalThis.fetch = fixtureFetch;
+
+        const invalidVerificationResponse = await worker.fetch(new Request('https://worker.example/', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://edubalance-ejg.web.app',
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'verify',
+                ejgCode: 'SHORT',
+                omAzonosito: '54321'
+            })
+        }), env);
+        assert.equal(invalidVerificationResponse.status, 400);
+        assert.deepEqual(await invalidVerificationResponse.json(), {
+            error: { code: 'invalid-argument' }
+        });
+
+        profileRole = 'admin';
         const invalidInspectorResponse = await worker.fetch(new Request('https://worker.example/', {
             method: 'POST',
             headers: {
@@ -204,8 +274,6 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
         assert.deepEqual(await deniedInspectorResponse.json(), {
             error: { code: 'permission-denied' }
         });
-
-        profileRole = 'user';
 
         const wrongProjectToken = await new SignJWT({ user_id: uid })
             .setProtectedHeader({ alg: 'RS256', kid: publicJwk.kid })

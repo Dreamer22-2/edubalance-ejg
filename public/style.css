@@ -717,6 +717,13 @@ button[hidden] {
     white-space: nowrap;
 }
 
+.profile-field-control {
+    display: grid;
+    justify-items: start;
+    gap: 6px;
+    min-width: 0;
+}
+
 .profile-fields input {
     width: 100%;
     max-width: 280px;
@@ -728,6 +735,50 @@ button[hidden] {
     color: #fff;
     font: inherit;
     text-align: left;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.profile-fields input[aria-invalid="true"] {
+    border-color: #f28b82;
+    box-shadow: 0 0 0 1px #f28b82;
+}
+
+.profile-fields input[aria-invalid="true"]:focus {
+    outline-color: rgba(242, 139, 130, 0.2);
+}
+
+.profile-field-error {
+    max-width: 280px;
+    color: #f28b82;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    text-align: left;
+}
+
+.profile-field-error:not([hidden]) {
+    animation: profile-field-error-enter 180ms ease-out;
+}
+
+@keyframes profile-field-error-enter {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .profile-fields input {
+        transition: none;
+    }
+
+    .profile-field-error:not([hidden]) {
+        animation: none;
+    }
 }
 
 @media (max-width: 480px) {
@@ -749,8 +800,14 @@ button[hidden] {
         min-width: 130px;
     }
 
-    .profile-fields input {
+    .profile-field-control,
+    .profile-fields input,
+    .profile-field-error {
+        width: 100%;
         max-width: 240px;
+    }
+
+    .profile-fields input {
         padding: 10px;
     }
 

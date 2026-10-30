@@ -322,6 +322,60 @@ function initializeProfileForm() {
     const profileForm = appMain.querySelector('#profile-form');
     if (!profileForm) return;
 
+    const ejgInput = profileForm.querySelector('#profile-ejg-code');
+    const omInput = profileForm.querySelector('#profile-om-identifier');
+    const touchedInputs = new Set();
+    let hasSubmitted = false;
+
+    const validateIdentifiers = () => {
+        const ejgCode = ejgInput.value.trim();
+        const omAzonosito = omInput.value.trim();
+        const hasAnyIdentifier = Boolean(ejgCode || omAzonosito);
+        const errors = [
+            {
+                input: ejgInput,
+                message: ejgCode && ejgCode.length !== 13
+                    ? `13 karakter szükséges (jelenleg ${ejgCode.length}).`
+                    : !ejgCode && hasAnyIdentifier && hasSubmitted
+                        ? 'Add meg az EJG-kódot is.'
+                        : '',
+                showOnSubmit: !ejgCode && hasAnyIdentifier
+            },
+            {
+                input: omInput,
+                message: omAzonosito && omAzonosito.length !== 5
+                    ? `5 számjegy szükséges (jelenleg ${omAzonosito.length}).`
+                    : omAzonosito && !/^\d{5}$/.test(omAzonosito)
+                        ? 'Az OM azonosító csak számjegyeket tartalmazhat.'
+                        : !omAzonosito && hasAnyIdentifier && hasSubmitted
+                            ? 'Add meg az OM azonosítót is.'
+                            : '',
+                showOnSubmit: !omAzonosito && hasAnyIdentifier
+            }
+        ];
+        let isValid = true;
+
+        errors.forEach(({ input, message, showOnSubmit }) => {
+            const errorElement = profileForm.querySelector(`#${input.id}-error`);
+            const shouldShowError = Boolean(message) &&
+                (touchedInputs.has(input) || (hasSubmitted && showOnSubmit));
+            errorElement.textContent = shouldShowError ? message : '';
+            errorElement.hidden = !shouldShowError;
+            input.setAttribute('aria-invalid', String(shouldShowError));
+            if (message) isValid = false;
+        });
+
+        return isValid;
+    };
+
+    [ejgInput, omInput].forEach((input) => {
+        input.addEventListener('blur', () => {
+            touchedInputs.add(input);
+            validateIdentifiers();
+        });
+        input.addEventListener('input', validateIdentifiers);
+    });
+
     profileForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         const user = auth.currentUser;
@@ -332,18 +386,56 @@ function initializeProfileForm() {
 
         const profileFields = profileForm.querySelector('#profile-fields');
         const saveButton = profileForm.querySelector('#profile-save-btn');
-        const ejgCode = profileForm.querySelector('#profile-ejg-code').value.trim();
-        const omAzonosito = profileForm.querySelector('#profile-om-identifier').value.trim();
-        if (Boolean(ejgCode) !== Boolean(omAzonosito)) {
-            showToast('Az EJG-kódot és az OM azonosítót együtt kell megadnod.', 'error');
+        hasSubmitted = true;
+        if (!validateIdentifiers()) {
             return;
         }
+        const ejgCode = ejgInput.value.trim();
+        const omAzonosito = omInput.value.trim();
 
         saveButton.disabled = true;
         saveButton.setAttribute('aria-busy', 'true');
         profileFields.disabled = true;
 
         try {
+            if (ejgCode && omAzonosito) {
+                try {
+                    if (location.hostname === 'localhost' ||
+                        location.hostname === '127.0.0.1' ||
+                        location.hostname.endsWith('.app.github.dev')) {
+                        const callable = firebase.app().functions('europe-central2')
+                            .httpsCallable('verifyMyTimetableIdentifiers');
+                        await callable({ ejgCode, omAzonosito });
+                    } else {
+                        const workerUrl = window.TIMETABLE_WORKER_URL;
+                        if (typeof workerUrl !== 'string' || !workerUrl.startsWith('https://')) {
+                            throw new Error('Timetable service is not configured.');
+                        }
+                        const response = await fetch(workerUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${await user.getIdToken()}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ action: 'verify', ejgCode, omAzonosito })
+                        });
+                        const responseData = await response.json();
+                        if (!response.ok || responseData.verified !== true) {
+                            throw Object.assign(new Error('School identifiers could not be verified.'), {
+                                code: responseData.error?.code || 'failed-precondition'
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('School identifier verification failed:', {
+                        code: error.code || 'unknown',
+                        message: error.message || 'No error message'
+                    });
+                    showToast('Az iskolai azonosítókat nem sikerült ellenőrizni. Ellenőrizd a kódokat, és próbáld újra.', 'error');
+                    return;
+                }
+            }
+
             await db.collection('users').doc(user.uid).update({
                 username: profileForm.querySelector('#profile-username').value.trim(),
                 schoolIdentifiers: { ejgCode, omAzonosito }

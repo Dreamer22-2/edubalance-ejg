@@ -271,13 +271,17 @@ export default {
                 return jsonResponse({ error: { code: 'invalid-argument' } }, 400, headers);
             }
             const bodyKeys = Object.keys(body);
-            const isInspectorRequest = bodyKeys.length > 0;
-            if (isInspectorRequest &&
-                (bodyKeys.length !== 2 ||
-                    !bodyKeys.includes('ejgCode') ||
-                    !bodyKeys.includes('omAzonosito') ||
-                    typeof body.ejgCode !== 'string' ||
-                    typeof body.omAzonosito !== 'string')) {
+            const isInspectorRequest = bodyKeys.length === 2 &&
+                bodyKeys.includes('ejgCode') &&
+                bodyKeys.includes('omAzonosito');
+            const isVerificationRequest = bodyKeys.length === 3 &&
+                bodyKeys.includes('action') &&
+                body.action === 'verify' &&
+                bodyKeys.includes('ejgCode') &&
+                bodyKeys.includes('omAzonosito');
+            if ((bodyKeys.length > 0 && !isInspectorRequest && !isVerificationRequest) ||
+                ((isInspectorRequest || isVerificationRequest) &&
+                    (typeof body.ejgCode !== 'string' || typeof body.omAzonosito !== 'string'))) {
                 return jsonResponse({ error: { code: 'invalid-argument' } }, 400, headers);
             }
 
@@ -312,16 +316,22 @@ export default {
             let ejgCode;
             let omAzonosito;
             let email = '(:';
-            if (isInspectorRequest) {
-                if (!['admin', 'dev', 'owner'].includes(role)) {
+            if (isInspectorRequest || isVerificationRequest) {
+                if (isInspectorRequest && !['admin', 'dev', 'owner'].includes(role)) {
                     return jsonResponse({ error: { code: 'permission-denied' } }, 403, headers);
                 }
                 ejgCode = body.ejgCode.trim();
                 omAzonosito = body.omAzonosito.trim();
-                if (!ejgCode || ejgCode.length > 40 || !/^\d{5}$/.test(omAzonosito)) {
+                const validInspectorCodes = Boolean(ejgCode) &&
+                    ejgCode.length <= 40 &&
+                    /^\d{5}$/.test(omAzonosito);
+                const validVerificationCodes = ejgCode.length === 13 &&
+                    /^\d{5}$/.test(omAzonosito);
+                if ((isInspectorRequest && !validInspectorCodes) ||
+                    (isVerificationRequest && !validVerificationCodes)) {
                     return jsonResponse({ error: { code: 'invalid-argument' } }, 400, headers);
                 }
-                email = 'X';
+                email = isInspectorRequest ? 'X' : '(:';
             } else {
                 const schoolIdentifiers = profile.fields?.schoolIdentifiers?.mapValue?.fields;
                 ejgCode = schoolIdentifiers?.ejgCode?.stringValue?.trim();
@@ -332,7 +342,12 @@ export default {
             }
 
             try {
-                return jsonResponse(await fetchTimetable(ejgCode, omAzonosito, email), 200, headers);
+                const timetable = await fetchTimetable(ejgCode, omAzonosito, email);
+                return jsonResponse(
+                    isVerificationRequest ? { verified: true } : timetable,
+                    200,
+                    headers
+                );
             } catch (error) {
                 if (error.code && error.status) throw error;
                 console.error('Timetable Worker school request failed:', error.name || 'Error');
