@@ -414,7 +414,8 @@ function initializeTimetable() {
             'functions/resource-exhausted': 'Az iskola túl nagy választ küldött. Próbáld újra később.',
             'functions/profile-permission-denied': 'Nem sikerült hozzáférni a profilhoz. Ellenőrizd a Firestore szabályokat.',
             'functions/profile-unavailable': 'A profiladatok most nem érhetők el. Próbáld újra később.',
-            'functions/school-unavailable': 'Az iskola órarend-szolgáltatása most nem érhető el. Próbáld újra később.',
+            'functions/school-connection-failed': 'Nem sikerült kapcsolódni az iskola órarend-szolgáltatásához. Próbáld újra később.',
+            'functions/school-upstream-rejected': 'Az iskola órarend-szolgáltatása elutasította a kérést. Próbáld újra később.',
             'functions/internal': 'Az órarend feldolgozása nem sikerült. Próbáld újra később.'
         };
 

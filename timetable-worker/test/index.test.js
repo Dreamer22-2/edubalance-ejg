@@ -113,6 +113,7 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
             });
         }
         if (url === 'https://suli.ejg.hu/intranet/szulkuk/szulkuk.php') {
+            if (schoolStatus === 'network-error') throw new TypeError('network failure');
             if (schoolStatus !== 200) return new Response(null, { status: schoolStatus });
             const html = [
                 ...new TextEncoder().encode('<big>'),
@@ -206,7 +207,22 @@ test('verifies Firebase tokens and forwards only the signed-in profile identifie
         }), env);
         assert.equal(unavailableSchoolResponse.status, 503);
         assert.deepEqual(await unavailableSchoolResponse.json(), {
-            error: { code: 'school-unavailable' }
+            error: { code: 'school-upstream-rejected' }
+        });
+
+        schoolStatus = 'network-error';
+        const networkFailureResponse = await worker.fetch(new Request('https://worker.example/', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://edubalance-ejg.web.app',
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: '{}'
+        }), env);
+        assert.equal(networkFailureResponse.status, 503);
+        assert.deepEqual(await networkFailureResponse.json(), {
+            error: { code: 'school-connection-failed' }
         });
     } finally {
         globalThis.fetch = originalFetch;
